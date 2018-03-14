@@ -59,15 +59,15 @@
 
 /* Private define ------------------------------------------------------------*/
 
-#define PIN_POWER_CONTROL_OUT_Pin GPIO_PIN_13
-#define PIN_POWER_CONTROL_OUT_GPIO_Port GPIOC
-#define PIN_EXPOSE_OK_IN_Pin GPIO_PIN_12
-#define PIN_EXPOSE_OK_IN_GPIO_Port GPIOB
-#define PIN_EXPOSE_OK_IN_EXTI_IRQn EXTI15_10_IRQn
-#define PIN_EXPOSE_REQUEST_OUT_Pin GPIO_PIN_8
-#define PIN_EXPOSE_REQUEST_OUT_GPIO_Port GPIOA
-#define PIN_PREPARE_OUT_Pin GPIO_PIN_15
-#define PIN_PREPARE_OUT_GPIO_Port GPIOA
+#define POWER_CONTROL_OUT_Pin GPIO_PIN_13
+#define POWER_CONTROL_OUT_GPIO_Port GPIOC
+#define EXPOSE_OK_IN_Pin GPIO_PIN_12
+#define EXPOSE_OK_IN_GPIO_Port GPIOB
+#define EXPOSE_OK_IN_EXTI_IRQn EXTI15_10_IRQn
+#define EXPOSE_REQUEST_OUT_Pin GPIO_PIN_8
+#define EXPOSE_REQUEST_OUT_GPIO_Port GPIOA
+#define PREPARE_OUT_Pin GPIO_PIN_15
+#define PREPARE_OUT_GPIO_Port GPIOA
 
 /* ########################## Assert Selection ############################## */
 /**

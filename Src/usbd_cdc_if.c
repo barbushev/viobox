@@ -93,8 +93,8 @@
 /* USER CODE BEGIN PRIVATE_DEFINES */
 /* Define size for the receive and transmit buffer over CDC */
 /* It's up to user to redefine and/or remove those define */
-#define APP_RX_DATA_SIZE  512
-#define APP_TX_DATA_SIZE  512
+#define APP_RX_DATA_SIZE  64
+#define APP_TX_DATA_SIZE  64
 /* USER CODE END PRIVATE_DEFINES */
 
 /**
@@ -291,9 +291,22 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
-  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
-  return (USBD_OK);
+
+	/* Data OUT transfer management (from host to device)
+	In general, the USB is much faster than the output terminal (i.e. the USART maximum
+	bitrate is 115.2 Kbps while USB bitrate is 12 Mbps for Full speed mode and 480 Mbps in
+	High speed mode). Consequently, before sending new packets, the host has to wait until the
+	device has finished to process the data sent by host. Thus, there is no need for circular data
+	buffer when a packet is received from host: the driver calls the lower layer OUT transfer
+	function and waits until this function is completed before allowing new transfers on the OUT
+	endpoint (meanwhile, OUT packets will be NACKed) */
+
+	vio_ProcessIncomingData(Buf, Len);
+
+	USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
+	//prepare to receive the next data
+	USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+	return (USBD_OK);
   /* USER CODE END 6 */
 }
 
@@ -308,16 +321,27 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   * @param  Len: Number of data to be sent (in bytes)
   * @retval USBD_OK if all operations are OK else USBD_FAIL or USBD_BUSY
   */
-uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
+uint8_t CDC_Transmit_FS(const char *Buf, uint16_t Len)
 {
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
-  if (hcdc->TxState != 0){
+  if (hcdc->TxState != 0)
     return USBD_BUSY;
-  }
-  USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
+
+  /*
+  	Data IN transfer management (from device to host)
+  	The data transfer is managed periodically depending on host request (the device specifies
+  	the interval between packet requests). For this reason, a circular static buffer is used for
+  	storing data sent by the device terminal (i.e. USART in the case of Virtual COM Port
+  	terminal).
+  	 */
+
+  memcpy(UserTxBufferFS, Buf, sizeof(char) * Len);
+  USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, Len);
+
   result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
+
   /* USER CODE END 7 */
   return result;
 }

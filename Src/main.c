@@ -82,7 +82,30 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
+#define SYSMEM_RESET_VECTOR            0x1fffC804
+#define RESET_TO_BOOTLOADER_MAGIC_CODE 0xDEADBEEF
+#define BOOTLOADER_STACK_POINTER       0x20002250
 
+uint32_t dfu_reset_to_bootloader_magic;
+
+void __initialize_hardware_early(void)
+{
+    if (dfu_reset_to_bootloader_magic == RESET_TO_BOOTLOADER_MAGIC_CODE)
+    {
+        void (*bootloader)(void) = (void (*)(void)) (*((uint32_t *) SYSMEM_RESET_VECTOR));
+        dfu_reset_to_bootloader_magic = 0;
+        __set_MSP(BOOTLOADER_STACK_POINTER);
+        bootloader();
+        while (1);
+    } else
+        SystemInit();
+}
+
+void dfu_run_bootloader()
+{
+    dfu_reset_to_bootloader_magic = RESET_TO_BOOTLOADER_MAGIC_CODE;
+    NVIC_SystemReset();
+}
 /* USER CODE END 0 */
 
 /**
@@ -338,19 +361,19 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(PIN_POWER_CONTROL_OUT_GPIO_Port, PIN_POWER_CONTROL_OUT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(POWER_CONTROL_OUT_GPIO_Port, POWER_CONTROL_OUT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PIN_POWER_CONTROL_OUT_Pin */
-  GPIO_InitStruct.Pin = PIN_POWER_CONTROL_OUT_Pin;
+  GPIO_InitStruct.Pin = POWER_CONTROL_OUT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(PIN_POWER_CONTROL_OUT_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(POWER_CONTROL_OUT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PIN_EXPOSE_OK_IN_Pin */
-  GPIO_InitStruct.Pin = PIN_EXPOSE_OK_IN_Pin;
+  GPIO_InitStruct.Pin = EXPOSE_OK_IN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(PIN_EXPOSE_OK_IN_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(EXPOSE_OK_IN_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 10, 0);
