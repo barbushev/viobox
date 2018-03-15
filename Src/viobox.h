@@ -21,7 +21,7 @@ const uint8_t VIO_MAJOR_VERSION = 0;
 const uint8_t VIO_MINOR_VERSION = 1;
 const uint8_t VIO_PATCH_VERSION = 5;
 
-const char VIO_COMM_DELIMETER[] = " ";
+const char VIO_COMM_DELIMETER = ' ';
 
 enum
 {
@@ -50,38 +50,48 @@ typedef enum
 
 typedef enum
 {
+	VIO_CMD_PING,				/// Returns VIO_STATUS_OK
 	VIO_CMD_REBOOT,				/// Reboot device
 	VIO_CMD_DFU,				/// Reboot device in DFU (device firmware upgrade) mode
+
+	/// READ commands
+	VIO_CMD_GET_BLOCK_START,
 	VIO_CMD_GET_FW_VER,
-	VIO_CMD_SET_EXPREQ_FREQUENCY,
-	VIO_CMD_GET_EXPREQ_FREQUENCY,
-	VIO_CMD_SET_EXPREQ_STATE,	/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
-	VIO_CMD_GET_EXPREQ_STATE,
-	VIO_CMD_SET_SSR_STATE,		/// Set the state of Solid State Relay. Requires a vio_ssr_state_t parameter.
-	VIO_CMD_GET_SSR_STATE,
 	VIO_CMD_GET_MIN_PERIOD_US,
 	VIO_CMD_GET_MAX_PERIOD_US,
 	VIO_CMD_GET_MAX_SEQUENCE_LENGTH,
-	VIO_CMD_SEQ_ADD,
-	VIO_CMD_SEQ_CLEAR,
-	cmdUserSyncEnable,
-	cmdUserSyncDisable,
-	cmdUserSyncFrequency,
-	cmdUserSyncPulseWidth,
-	cmdUserSyncOnePulse, 					//takes a uint32_t parameter with pulse length in ms. Generates one pulse with the specified pulse width and returns msgOnePulseComplete.
+	VIO_CMD_GET_SSR_STATE,
+	VIO_CMD_GET_EXPREQ_STATE,
+	VIO_CMD_GET_EXPREQ_FREQUENCY,
+	VIO_CMD_GET_EXPREQ_ONE_PULSE_LENGTH,
+	VIO_CMD_GET_EXPREQ_FIXPWM_PWIDTH,           ///
+	VIO_CMD_GET_EXPREQ_VARPWM_COUNT,    		/// Returns the value of vio_expreq_varpwm_t.count
+	VIO_CMD_GET_EXPREQ_VARPWM_POSITION, 		/// Returns the value of vio_expreq_varpwm_t.position
+	VIO_CMD_GET_EXPREQ_VARPWM_LOOPING,  		/// Returns the value of vio_expreq_varpwm_t.enableLooping
+	VIO_CMD_GET_EXPREQ_VARPWM_NUMLOOPS, 		/// Returns the value of vio_expreq_varpwm_t.numLoops
+	VIO_CMD_GET_EXPREQ_VARPWM_WAITFOREXTSYNC,   /// Returns the value of vio_expreq_varpwm_t.waitForExtSync
+	VIO_CMD_GET_EXPREQ_VARPWM_ELEMENT,          /// Takes a parameter of Element Number. Returns the value of that element if it exists.
+	VIO_CMD_GET_PREP_TIMEUS,
+	VIO_CMD_GET_PREP_ISRUNNING,
+	VIO_CMD_GET_BLOCK_END,
+
+	//WRITE commands
+	VIO_CMD_SET_SSR_STATE,		/// Set the state of Solid State Relay. Requires a vio_ssr_state_t parameter.
+	VIO_CMD_SET_EXPREQ_ONE_PULSE_LENGTH,
+	VIO_CMD_SET_EXPREQ_STATE,	/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
+	VIO_CMD_SET_EXPREQ_FREQUENCY,
+	VIO_CMD_SET_EXPREQ_FIXPWM_PWIDTH,
+	VIO_CMD_SET_EXPREQ_VARPWM_LOOPING,  /// Takes a parameter of bool (0 or 1). Enables or disables looping.
+	VIO_CMD_SET_EXPREQ_VARPWM_WAITFOREXTSYNC,
+	VIO_CMD_SET_EXPREQ_VARPWM_EMPTY,           /// Clear all vio_expreq_varpwm_t.elements
+	VIO_CMD_SET_EXPREQ_VARPWM_ADD,			   /// Takes a parameter pulseWidthUs. Adds it to the end of the queue.
+	VIO_CMD_SET_PREP_TIMEUS,
+	VIO_CMD_SET_PREP_ISRUNNING,
+
 	cmdGetStatus,
-	cmdQueueAdd,
-	cmdQueueClear,
-	cmdQueueList,
-	cmdQueueStart,
-	cmdQueueAbort,
-	cmdQueueRunOnce,
-	cmdQueueRunInfinite,
 	cmdMcuReset,
 	cmdSetOutputActiveHigh,
 	cmdSetOutputActiveLow,
-	cmdExtIntSyncEnable,
-	cmdExtIntSyncDisable,
 	cmdSetExposeSkip,				//takes a uint8_t parameter with number of pulses to skip.
 	cmdUserSyncOnePulseStop,
 }vio_commands_t;
