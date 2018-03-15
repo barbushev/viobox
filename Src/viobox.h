@@ -18,8 +18,10 @@ PATCH version when you make backwards-compatible bug fixes.
 */
 
 const uint8_t VIO_MAJOR_VERSION = 0;
-const uint8_t VIO_MINOR_VERSION = 0;
-const uint8_t VIO_PATCH_VERSION = 0;
+const uint8_t VIO_MINOR_VERSION = 1;
+const uint8_t VIO_PATCH_VERSION = 5;
+
+const char VIO_COMM_DELIMETER[] = " ";
 
 enum
 {
@@ -37,13 +39,13 @@ typedef enum
 typedef enum
 {
 	VIO_STATUS_OK,
-	VIO_STATUS_BAD_COMMAND,
-	VIO_STATUS_BAD_PARAMETER,
 	VIO_STATUS_GENERIC_ERROR,
 	VIO_STATUS_SEQUENCE_IS_RUNNING,
 	VIO_STATUS_SEQUENCE_QUEUE_FULL,
 	VIO_STATUS_SEQUENCE_QUEUE_EMPTY,
 	VIO_STATUS_OUT_OF_RANGE,
+	VIO_STATUS_BAD_COMMAND,
+	VIO_STATUS_BAD_PARAMETER,
 }vio_status_t;
 
 typedef enum
@@ -53,10 +55,13 @@ typedef enum
 	VIO_CMD_GET_FW_VER,
 	VIO_CMD_SET_EXPREQ_FREQUENCY,
 	VIO_CMD_GET_EXPREQ_FREQUENCY,
-	VIO_CMD_EXPREQ_START,
-	VIO_CMD_EXPREQ_STOP,
-	VIO_CMD_POWER_OFF,
-	VIO_CMD_POWER_ON,
+	VIO_CMD_SET_EXPREQ_STATE,	/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
+	VIO_CMD_GET_EXPREQ_STATE,
+	VIO_CMD_SET_SSR_STATE,		/// Set the state of Solid State Relay. Requires a vio_ssr_state_t parameter.
+	VIO_CMD_GET_SSR_STATE,
+	VIO_CMD_GET_MIN_PERIOD_US,
+	VIO_CMD_GET_MAX_PERIOD_US,
+	VIO_CMD_GET_MAX_SEQUENCE_LENGTH,
 	VIO_CMD_SEQ_ADD,
 	VIO_CMD_SEQ_CLEAR,
 	cmdUserSyncEnable,
@@ -80,6 +85,12 @@ typedef enum
 	cmdSetExposeSkip,				//takes a uint8_t parameter with number of pulses to skip.
 	cmdUserSyncOnePulseStop,
 }vio_commands_t;
+
+typedef enum
+{
+	VIO_SSR_OPEN,
+	VIO_SSR_CLOSED,
+}vio_ssr_state_t;
 
 typedef enum
 {

@@ -14,12 +14,21 @@
 #include "usbd_cdc_if.h"
 #include "usbd_desc.h"
 
-static vio_status_t exposeReqSetState(vio_expreq_state_t);
+static vio_status_t setExposeReqState(vio_expreq_state_t);
+static vio_status_t getExposeReqState(vio_expreq_state_t *);
+
+static vio_status_t setExposeReqFrequency(uint32_t);
+static vio_status_t getExposeReqFrequency(uint32_t *);
+
 static vio_status_t varPwmAdd(uint32_t);
 static vio_status_t varPwmClear(void);
 static vio_status_t varPwmList(void);
 
 static vio_status_t isPeriodInRange(const uint32_t *);
+static vio_status_t setSsrState(vio_ssr_state_t);
+static vio_status_t getSsrState(vio_ssr_state_t *curState);
+
+static void sendData(const char *buf, uint8_t len);
 static void USB_SEND(const char *string, ...);
 
 
@@ -60,12 +69,10 @@ static vio_exposeok_t expOk =
 //PWR - output
 
 
-vio_status_t vio_ProcessIncomingData(const char *inBuf, uint16_t len)
+void vio_ProcessIncomingData(const char *inBuf, uint16_t len)
 {
-	vio_status_t result = 0;
-
-	if (len == 0)
-		return VIO_STATUS_BAD_COMMAND;
+	vio_status_t result = VIO_STATUS_OK;
+	char respParam[48] = "";
 
 	char *pLeftover;
 	int32_t cmd = strtol(inBuf, &pLeftover, 10);
@@ -73,25 +80,65 @@ vio_status_t vio_ProcessIncomingData(const char *inBuf, uint16_t len)
 	{
 		case VIO_CMD_GET_FW_VER:
 		{
-			USB_SEND("%d.%d.%d\n", VIO_MAJOR_VERSION, VIO_MINOR_VERSION, VIO_PATCH_VERSION);
+			//USB_SEND("%d.%d.%d\n", VIO_MAJOR_VERSION, VIO_MINOR_VERSION, VIO_PATCH_VERSION);
+			snprintf(respParam, sizeof(respParam), " %d.%d.%d", VIO_MAJOR_VERSION, VIO_MINOR_VERSION, VIO_PATCH_VERSION);
 			break;
 		}
+
+		case VIO_CMD_GET_MIN_PERIOD_US:
+			snprintf(respParam, sizeof(respParam), " %d", VIO_MIN_PERIOD_US);
+			break;
+
+		case VIO_CMD_GET_MAX_PERIOD_US:
+			snprintf(respParam, sizeof(respParam), " %d", VIO_MAX_PERIOD_US);
+			break;
+
+		case VIO_CMD_GET_MAX_SEQUENCE_LENGTH:
+			snprintf(respParam, sizeof(respParam), " %d", VIO_MAX_SEQUENCE_LENGTH);
+			break;
 
 		case VIO_CMD_SET_EXPREQ_FREQUENCY:
 		{
-			strtol(pLeftover, NULL, 10);
+			result = setExposeReqFrequency(strtol(pLeftover, NULL, 10));
 			break;
 		}
 
-		case VIO_CMD_POWER_OFF:
+		case VIO_CMD_GET_EXPREQ_FREQUENCY:
 		{
-
+			uint32_t periodUs;
+			result = getExposeReqFrequency(&periodUs);
+			if (result == VIO_STATUS_OK)
+				snprintf(respParam, sizeof(respParam), " %lu", periodUs);
 			break;
 		}
 
-		case VIO_CMD_POWER_ON:
+		case VIO_CMD_SET_EXPREQ_STATE:
 		{
+			result = setExposeReqState(strtol(pLeftover, NULL, 10));
+			break;
+		}
 
+		case VIO_CMD_GET_EXPREQ_STATE:
+		{
+			vio_expreq_state_t curState;
+			result = getExposeReqState(&curState);
+			if (result == VIO_STATUS_OK)
+				snprintf(respParam, sizeof(respParam), " %d", curState);
+			break;
+		}
+
+		case VIO_CMD_SET_SSR_STATE:
+		{
+			result = setSsrState(strtol(pLeftover, NULL, 10));
+			break;
+		}
+
+		case VIO_CMD_GET_SSR_STATE:
+		{
+			vio_ssr_state_t curState;
+			result = getSsrState(&curState);
+			if (result == VIO_STATUS_OK)
+				snprintf(respParam, sizeof(respParam), " %d", curState);
 			break;
 		}
 
@@ -107,15 +154,16 @@ vio_status_t vio_ProcessIncomingData(const char *inBuf, uint16_t len)
 			break;
 		}
 
-		case VIO_CMD_EXPREQ_START:
+		default:
 		{
-			result = exposeReqSetState(VIO_EXPREQ_VARIABLE_PWM);
+			result = VIO_STATUS_BAD_COMMAND;
 			break;
 		}
 	}
 
-//sendResponse() send the original command + vio_status_t
-	return result;
+	char resp[64];
+	snprintf(resp, sizeof(resp), "%s %d%s", inBuf, result, respParam);
+    sendData(resp, strlen(resp));
 }
 
 static vio_status_t varPwmAdd(uint32_t pulseWidth)
@@ -150,6 +198,24 @@ static vio_status_t varPwmList(void)
 	return VIO_STATUS_OK;
 }
 
+
+static vio_status_t setExposeReqFrequency(uint32_t periodUs)
+{
+	if (isPeriodInRange(&periodUs) != VIO_STATUS_OK)
+		return isPeriodInRange(&periodUs);
+
+	expReq.fPeriodUs = periodUs;
+
+	return VIO_STATUS_OK;
+}
+
+static vio_status_t getExposeReqFrequency(uint32_t *periodUs)
+{
+	*periodUs = expReq.fPeriodUs;
+	return VIO_STATUS_OK;
+}
+
+
 static vio_status_t isPeriodInRange(const uint32_t *fPeriodUs)
 {
 	if(((*fPeriodUs < VIO_MIN_PERIOD_US) && (*fPeriodUs > VIO_MAX_PERIOD_US)))
@@ -158,7 +224,7 @@ static vio_status_t isPeriodInRange(const uint32_t *fPeriodUs)
 	return VIO_STATUS_OK;
 }
 
-static vio_status_t exposeReqSetState(vio_expreq_state_t newState)
+static vio_status_t setExposeReqState(vio_expreq_state_t newState)
 {
 	switch(newState)
 	{
@@ -166,6 +232,7 @@ static vio_status_t exposeReqSetState(vio_expreq_state_t newState)
 		case VIO_EXPREQ_ONE_PULSE:
 		case VIO_EXPREQ_FIXED_PWM:
 		case VIO_EXPREQ_VARIABLE_PWM:
+			expReq.State = newState;
 			break;
 		default:
 			return VIO_STATUS_GENERIC_ERROR;
@@ -174,10 +241,31 @@ static vio_status_t exposeReqSetState(vio_expreq_state_t newState)
 	return VIO_STATUS_OK;
 }
 
-
-static void prepareResponse(char *resp)
+static vio_status_t getExposeReqState(vio_expreq_state_t *curState)
 {
+	*curState = expReq.State;
+	return VIO_STATUS_OK;
+}
 
+static vio_status_t setSsrState(vio_ssr_state_t newState)
+{
+	if ((newState != VIO_SSR_OPEN) && (newState != VIO_SSR_CLOSED))
+		return VIO_STATUS_BAD_PARAMETER;
+
+	HAL_GPIO_WritePin(POWER_CONTROL_OUT_GPIO_Port, POWER_CONTROL_OUT_Pin, newState);
+	return VIO_STATUS_OK;
+}
+
+static vio_status_t getSsrState(vio_ssr_state_t *curState)
+{
+	*curState = HAL_GPIO_ReadPin(POWER_CONTROL_OUT_GPIO_Port, POWER_CONTROL_OUT_Pin);
+	return VIO_STATUS_OK;
+}
+
+
+static void sendData(const char *buf, uint8_t len)
+{
+	CDC_Transmit_FS(buf, len);
 }
 
 static void USB_SEND(const char *string, ...)

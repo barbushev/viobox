@@ -82,6 +82,7 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
+/*
 #define SYSMEM_RESET_VECTOR            0x1fffC804
 #define RESET_TO_BOOTLOADER_MAGIC_CODE 0xDEADBEEF
 #define BOOTLOADER_STACK_POINTER       0x20002250
@@ -106,6 +107,7 @@ void dfu_run_bootloader()
     dfu_reset_to_bootloader_magic = RESET_TO_BOOTLOADER_MAGIC_CODE;
     NVIC_SystemReset();
 }
+*/
 /* USER CODE END 0 */
 
 /**
@@ -139,7 +141,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
   MX_TIM1_Init();
-  MX_IWDG_Init();
+  //MX_IWDG_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
@@ -185,8 +187,7 @@ void SystemClock_Config(void)
     _Error_Handler(__FILE__, __LINE__);
   }
 
-    /**Initializes the CPU, AHB and APB busses clocks 
-    */
+    /**Initializes the CPU, AHB and APB busses clocks */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
