@@ -301,7 +301,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 	function and waits until this function is completed before allowing new transfers on the OUT
 	endpoint (meanwhile, OUT packets will be NACKed) */
 
-	vio_ProcessIncomingData(Buf, Len);
+	vio_recv_data(Buf, Len);
 
 	USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
 	//prepare to receive the next data

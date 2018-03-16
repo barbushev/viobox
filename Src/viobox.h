@@ -14,21 +14,16 @@
 MAJOR.MINOR.PATCH, increment the:
 MAJOR version when you make incompatible API changes,
 MINOR version when you add functionality in a backwards-compatible manner, and
-PATCH version when you make backwards-compatible bug fixes.
-*/
+PATCH version when you make backwards-compatible bug fixes.*/
 
 const uint8_t VIO_MAJOR_VERSION = 0;
 const uint8_t VIO_MINOR_VERSION = 1;
 const uint8_t VIO_PATCH_VERSION = 5;
-
+const uint32_t VIO_MIN_PERIOD_US = 10;				/// Minimum pulse length in microseconds
+const uint32_t VIO_MAX_PERIOD_US = 5000;			/// Maximum pulse length in microseconds
+enum{VIO_MAX_VARPWM_SEQUENCE_LENGTH = 1000};		/// Maximum number of elements in the variable pwm queue
 const char VIO_COMM_DELIMETER = ' ';
-
-enum
-{
-	VIO_MAX_SEQUENCE_LENGTH = 1000,		/// Maximum number of elements in the variable pwm queue
-	VIO_MIN_PERIOD_US = 10,				/// Minimum pulse length in microseconds
-	VIO_MAX_PERIOD_US = 5000			/// Maximum pulse length in microseconds
-};
+const char VIO_COMM_TERMINATOR = '\n';
 
 typedef enum
 {
@@ -40,9 +35,11 @@ typedef enum
 {
 	VIO_STATUS_OK,
 	VIO_STATUS_GENERIC_ERROR,
-	VIO_STATUS_SEQUENCE_IS_RUNNING,
+	VIO_STATUS_VARPWM_IS_RUNNING,
 	VIO_STATUS_SEQUENCE_QUEUE_FULL,
 	VIO_STATUS_SEQUENCE_QUEUE_EMPTY,
+	VIO_STATUS_PREP_IS_RUNNING,
+	VIO_STATUS_PREP_NOT_CONFIGURED,
 	VIO_STATUS_OUT_OF_RANGE,
 	VIO_STATUS_BAD_COMMAND,
 	VIO_STATUS_BAD_PARAMETER,
@@ -50,12 +47,8 @@ typedef enum
 
 typedef enum
 {
-	VIO_CMD_PING,				/// Returns VIO_STATUS_OK
-	VIO_CMD_REBOOT,				/// Reboot device
-	VIO_CMD_DFU,				/// Reboot device in DFU (device firmware upgrade) mode
-
-	/// READ commands
-	VIO_CMD_GET_BLOCK_START,
+	// GET commands
+	VIO_CMD_GET_BLOCK_START,				   /// Marks the start of GET block. Returns VIO_STATUS_OK. Could be used to ping the device.
 	VIO_CMD_GET_FW_VER,
 	VIO_CMD_GET_MIN_PERIOD_US,
 	VIO_CMD_GET_MAX_PERIOD_US,
@@ -73,9 +66,16 @@ typedef enum
 	VIO_CMD_GET_EXPREQ_VARPWM_ELEMENT,          /// Takes a parameter of Element Number. Returns the value of that element if it exists.
 	VIO_CMD_GET_PREP_TIMEUS,
 	VIO_CMD_GET_PREP_ISRUNNING,
-	VIO_CMD_GET_BLOCK_END,
+	VIO_CMD_GET_EXPOK_COUNT,
+	VIO_CMD_GET_EXPOK_NOTIFY,
+	VIO_CMD_GET_BLOCK_END,						/// Marks the end of GET block. Returns VIO_STATUS_OK. Could be used to ping the device.
 
-	//WRITE commands
+	// Specail commands are located between GET_BLOCK_END and SET_BLOCK_START
+	VIO_CMD_REBOOT,				/// Reboot device
+	VIO_CMD_DFU,				/// Reboot device in DFU (device firmware upgrade) mode
+
+	// SET commands
+	VIO_CMD_SET_BLOCK_START,				   /// Marks the start of SET block. Returns VIO_STATUS_OK. Could be used to ping the device.
 	VIO_CMD_SET_SSR_STATE,		/// Set the state of Solid State Relay. Requires a vio_ssr_state_t parameter.
 	VIO_CMD_SET_EXPREQ_ONE_PULSE_LENGTH,
 	VIO_CMD_SET_EXPREQ_STATE,	/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
@@ -87,13 +87,9 @@ typedef enum
 	VIO_CMD_SET_EXPREQ_VARPWM_ADD,			   /// Takes a parameter pulseWidthUs. Adds it to the end of the queue.
 	VIO_CMD_SET_PREP_TIMEUS,
 	VIO_CMD_SET_PREP_ISRUNNING,
-
-	cmdGetStatus,
-	cmdMcuReset,
-	cmdSetOutputActiveHigh,
-	cmdSetOutputActiveLow,
-	cmdSetExposeSkip,				//takes a uint8_t parameter with number of pulses to skip.
-	cmdUserSyncOnePulseStop,
+	VIO_CMD_SET_EXPOK_COUNT_ZERO,
+	VIO_CMD_SET_EXPOK_NOTIFY,
+	VIO_CMD_SET_BLOCK_END,				   /// Marks the end of SET block. Returns VIO_STATUS_OK. Could be used to ping the device.
 }vio_commands_t;
 
 typedef enum
@@ -126,7 +122,7 @@ typedef struct
 	uint16_t position;	      		/// Current position of the sequence.
 	bool enableLooping;  		    /// Indicates if looping is enabled.
 	volatile uint32_t numLoops;	    /// Number of completed loops.
-	uint32_t elements[VIO_MAX_SEQUENCE_LENGTH];	/// Sequence pulse widths in microseconds.
+	uint32_t elements[VIO_MAX_VARPWM_SEQUENCE_LENGTH];	/// Sequence pulse widths in microseconds.
 	volatile bool waitForExtSync;   /// Sequence shall wait for external sync before starting.
 }vio_expreq_varpwm_t;
 
