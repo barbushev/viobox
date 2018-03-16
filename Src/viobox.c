@@ -72,15 +72,15 @@ static vio_status_t(*vio_get[])(char *, uint8_t) =
 
 static vio_status_t(*vio_set[])(const void *) =
 {
-	[VIO_CMD_SET_SSR_STATE] = vio_set_ssr_state,		/// Set the state of Solid State Relay. Requires a vio_ssr_state_t parameter.
+	[VIO_CMD_SET_SSR_STATE] = vio_set_ssr_state,							 	/// Set the state of Solid State Relay. Requires a vio_ssr_state_t parameter.
 	[VIO_CMD_SET_EXPREQ_ONE_PULSE_LENGTH] = vio_set_expreq_one_pulse_length,
-	[VIO_CMD_SET_EXPREQ_STATE] = vio_set_expreq_state,	/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
+	[VIO_CMD_SET_EXPREQ_STATE] = vio_set_expreq_state,							/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
 	[VIO_CMD_SET_EXPREQ_FREQUENCY] = vio_set_expreq_frequency,
 	[VIO_CMD_SET_EXPREQ_FIXPWM_PWIDTH] = vio_set_expreq_fixpwm_pwidth,
-	[VIO_CMD_SET_EXPREQ_VARPWM_LOOPING] = vio_set_expreq_varpwm_looping,  /// Takes a parameter of bool (0 or 1). Enables or disables looping.
+	[VIO_CMD_SET_EXPREQ_VARPWM_LOOPING] = vio_set_expreq_varpwm_looping,  		/// Takes a parameter of bool (0 or 1). Enables or disables looping.
 	[VIO_CMD_SET_EXPREQ_VARPWM_WAITFOREXTSYNC] = vio_set_expreq_varpwm_waitforextsync,
-	[VIO_CMD_SET_EXPREQ_VARPWM_EMPTY] = vio_set_expreq_varpwm_empty,           /// Clear all vio_expreq_varpwm_t.elements
-	[VIO_CMD_SET_EXPREQ_VARPWM_ADD] = vio_set_expreq_varpwm_add,			   /// Takes a parameter pulseWidthUs. Adds it to the end of the queue.
+	[VIO_CMD_SET_EXPREQ_VARPWM_EMPTY] = vio_set_expreq_varpwm_empty,            /// Clear all vio_expreq_varpwm_t.elements
+	[VIO_CMD_SET_EXPREQ_VARPWM_ADD] = vio_set_expreq_varpwm_add,			    /// Takes a parameter pulseWidthUs. Adds it to the end of the queue.
 	[VIO_CMD_SET_PREP_TIMEUS] = vio_set_prep_timeus,
 	[VIO_CMD_SET_PREP_ISRUNNING] = vio_set_prep_isrunning,
 	[VIO_CMD_SET_EXPOK_COUNT_ZERO] = vio_set_expok_count_zero,
@@ -90,7 +90,6 @@ static vio_status_t(*vio_set[])(const void *) =
 static vio_status_t vio_is_period_in_range(const uint32_t *);
 static void vio_send_data(const char *buf, uint8_t len);
 //static void USB_SEND(const char *string, ...);
-
 
 static vio_expose_request_t expReq =
 {
@@ -119,17 +118,17 @@ static vio_exposeok_t expOk =
 
 void vio_recv_data(const char *inBuf, uint16_t len)
 {
-	vio_status_t result = VIO_STATUS_OK;
+	vio_status_t result = VIO_STATUS_BAD_COMMAND;
 	char respParam[48] = "";
-
 	char *pLeftover;
+
 	uint32_t cmd = strtoul(inBuf, &pLeftover, 10);
 
-	if((cmd > VIO_CMD_GET_BLOCK_START) && (cmd < VIO_CMD_GET_BLOCK_END))
+	if((cmd > VIO_CMD_GET_BLOCK_START) && (cmd < VIO_CMD_GET_BLOCK_END)) // Check if it is a GET command
 	{
 		result = vio_get[cmd](respParam, sizeof(respParam));
 	}
-	else if((cmd > VIO_CMD_SET_BLOCK_START) && (cmd < VIO_CMD_SET_BLOCK_END))
+	else if((cmd > VIO_CMD_SET_BLOCK_START) && (cmd < VIO_CMD_SET_BLOCK_END))  //Check if it is a SET command
 	{
 		result = VIO_STATUS_BAD_PARAMETER;  //assume a bad parameter then check
 		if (pLeftover[0] == VIO_COMM_DELIMETER)
@@ -142,6 +141,10 @@ void vio_recv_data(const char *inBuf, uint16_t len)
 				snprintf(respParam, sizeof(respParam), "%lu", prm);
 			}
 		}
+	}
+	else if((cmd > VIO_CMD_GET_BLOCK_END) && (cmd < VIO_CMD_SET_BLOCK_START))  //Check if it is a Special command
+	{
+		vio_status_t result = VIO_STATUS_OK;
 	}
 
 	char resp[64];
@@ -394,6 +397,20 @@ static void vio_send_data(const char *buf, uint8_t len)
 {
 	CDC_Transmit_FS(buf, len);
 }
+
+/**
+  * @brief EXTI line detection callbacks
+  * @param GPIO_Pin: Specifies the pins connected EXTI line
+  * @retval None
+  */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if(GPIO_Pin == EXPOSE_OK_IN_Pin)
+  {
+	  expOk.count++;
+  }
+}
+
 
 /*
 static void USB_SEND(const char *string, ...)

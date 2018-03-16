@@ -48,7 +48,7 @@ typedef enum
 typedef enum
 {
 	// GET commands
-	VIO_CMD_GET_BLOCK_START,				   /// Marks the start of GET block. Returns VIO_STATUS_OK. Could be used to ping the device.
+	VIO_CMD_GET_BLOCK_START,				   /// Marks the start of GET block. Returns VIO_STATUS_BAD_COMMAND.
 	VIO_CMD_GET_FW_VER,
 	VIO_CMD_GET_MIN_PERIOD_US,
 	VIO_CMD_GET_MAX_PERIOD_US,
@@ -68,20 +68,20 @@ typedef enum
 	VIO_CMD_GET_PREP_ISRUNNING,
 	VIO_CMD_GET_EXPOK_COUNT,
 	VIO_CMD_GET_EXPOK_NOTIFY,
-	VIO_CMD_GET_BLOCK_END,						/// Marks the end of GET block. Returns VIO_STATUS_OK. Could be used to ping the device.
+	VIO_CMD_GET_BLOCK_END,						/// Marks the end of GET block. Returns VIO_STATUS_BAD_COMMAND.
 
 	// Specail commands are located between GET_BLOCK_END and SET_BLOCK_START
 	VIO_CMD_REBOOT,				/// Reboot device
 	VIO_CMD_DFU,				/// Reboot device in DFU (device firmware upgrade) mode
 
 	// SET commands
-	VIO_CMD_SET_BLOCK_START,				   /// Marks the start of SET block. Returns VIO_STATUS_OK. Could be used to ping the device.
-	VIO_CMD_SET_SSR_STATE,		/// Set the state of Solid State Relay. Requires a vio_ssr_state_t parameter.
-	VIO_CMD_SET_EXPREQ_ONE_PULSE_LENGTH,
-	VIO_CMD_SET_EXPREQ_STATE,	/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
-	VIO_CMD_SET_EXPREQ_FREQUENCY,
-	VIO_CMD_SET_EXPREQ_FIXPWM_PWIDTH,
-	VIO_CMD_SET_EXPREQ_VARPWM_LOOPING,  /// Takes a parameter of bool (0 or 1). Enables or disables looping.
+	VIO_CMD_SET_BLOCK_START,				   	/// Marks the start of SET block. Returns VIO_STATUS_BAD_COMMAND.
+	VIO_CMD_SET_SSR_STATE,					   	/// Set the state of Solid State Relay. Requires a vio_ssr_state_t parameter.
+	VIO_CMD_SET_EXPREQ_ONE_PULSE_LENGTH,		/// Set the length of One pulse. Requires a vio_expreq_onepulse_t.lengthUs parameter.
+	VIO_CMD_SET_EXPREQ_STATE,				  	/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
+	VIO_CMD_SET_EXPREQ_FREQUENCY,				///
+	VIO_CMD_SET_EXPREQ_FIXPWM_PWIDTH,			///
+	VIO_CMD_SET_EXPREQ_VARPWM_LOOPING,  		/// Takes a parameter of bool (0 or 1). Enables or disables looping.
 	VIO_CMD_SET_EXPREQ_VARPWM_WAITFOREXTSYNC,
 	VIO_CMD_SET_EXPREQ_VARPWM_EMPTY,           /// Clear all vio_expreq_varpwm_t.elements
 	VIO_CMD_SET_EXPREQ_VARPWM_ADD,			   /// Takes a parameter pulseWidthUs. Adds it to the end of the queue.
@@ -89,7 +89,7 @@ typedef enum
 	VIO_CMD_SET_PREP_ISRUNNING,
 	VIO_CMD_SET_EXPOK_COUNT_ZERO,
 	VIO_CMD_SET_EXPOK_NOTIFY,
-	VIO_CMD_SET_BLOCK_END,				   /// Marks the end of SET block. Returns VIO_STATUS_OK. Could be used to ping the device.
+	VIO_CMD_SET_BLOCK_END,				   	    /// Marks the end of SET block. Returns VIO_STATUS_BAD_COMMAND.
 }vio_commands_t;
 
 typedef enum
@@ -143,7 +143,7 @@ typedef struct
 
 typedef struct
 {
-	uint32_t count;						/// Number of Falling edges detected so far.
+	volatile uint32_t count;			/// Number of Falling edges detected so far.
 	bool notify;						/// When set to true, it sends a message every time a Falling edge is detected.
 }vio_exposeok_t;
 
