@@ -21,19 +21,20 @@ const uint8_t VIO_MINOR_VERSION = 1;
 const uint8_t VIO_PATCH_VERSION = 5;
 const uint32_t VIO_MIN_PERIOD_US = 10;				/// Minimum pulse length in microseconds
 const uint32_t VIO_MAX_PERIOD_US = 5000;			/// Maximum pulse length in microseconds
-enum{VIO_MAX_VARPWM_SEQUENCE_LENGTH = 1000};		/// Maximum number of elements in the variable pwm queue
+enum{VIO_MAX_VARPWM_SEQUENCE_LENGTH = 5000};		/// Maximum number of elements in the variable pwm queue
 const char VIO_COMM_DELIMETER = ' ';
 const char VIO_COMM_TERMINATOR = '\n';
 
 typedef enum
 {
-	true,
-	false
+	false,
+	true
 } bool;
 
 typedef enum
 {
 	VIO_STATUS_OK,
+	VIO_STATUS_EXPOSEOK_EVENT,
 	VIO_STATUS_GENERIC_ERROR,
 	VIO_STATUS_VARPWM_IS_RUNNING,
 	VIO_STATUS_SEQUENCE_QUEUE_FULL,
@@ -68,11 +69,12 @@ typedef enum
 	VIO_CMD_GET_PREP_ISRUNNING,
 	VIO_CMD_GET_EXPOK_COUNT,
 	VIO_CMD_GET_EXPOK_NOTIFY,
+	VIO_CMD_GET_SERIAL_NUMBER,
 	VIO_CMD_GET_BLOCK_END,						/// Marks the end of GET block. Returns VIO_STATUS_BAD_COMMAND.
 
-	// Specail commands are located between GET_BLOCK_END and SET_BLOCK_START
-	VIO_CMD_REBOOT,				/// Reboot device
-	VIO_CMD_DFU,				/// Reboot device in DFU (device firmware upgrade) mode
+	// System commands are located between GET_BLOCK_END and SET_BLOCK_START
+	VIO_CMD_SYS_REBOOT,				/// Reboot device
+	VIO_CMD_SYS_DFU,				/// Reboot device in DFU (device firmware upgrade) mode
 
 	// SET commands
 	VIO_CMD_SET_BLOCK_START,				   	/// Marks the start of SET block. Returns VIO_STATUS_BAD_COMMAND.
@@ -89,6 +91,7 @@ typedef enum
 	VIO_CMD_SET_PREP_ISRUNNING,
 	VIO_CMD_SET_EXPOK_COUNT_ZERO,
 	VIO_CMD_SET_EXPOK_NOTIFY,
+	VIO_CMD_SET_SERIAL_NUMBER,
 	VIO_CMD_SET_BLOCK_END,				   	    /// Marks the end of SET block. Returns VIO_STATUS_BAD_COMMAND.
 }vio_commands_t;
 
@@ -122,7 +125,7 @@ typedef struct
 	uint16_t position;	      		/// Current position of the sequence.
 	bool enableLooping;  		    /// Indicates if looping is enabled.
 	volatile uint32_t numLoops;	    /// Number of completed loops.
-	uint32_t elements[VIO_MAX_VARPWM_SEQUENCE_LENGTH];	/// Sequence pulse widths in microseconds.
+	uint16_t elements[VIO_MAX_VARPWM_SEQUENCE_LENGTH];	/// Sequence pulse widths in microseconds.
 	volatile bool waitForExtSync;   /// Sequence shall wait for external sync before starting.
 }vio_expreq_varpwm_t;
 

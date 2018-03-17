@@ -32,6 +32,7 @@ static vio_status_t vio_get_prep_timeus(char *buf, uint8_t len);
 static vio_status_t vio_get_prep_isrunning(char *buf, uint8_t len);
 static vio_status_t vio_get_expok_count(char *buf, uint8_t len);
 static vio_status_t vio_get_expok_notify(char *buf, uint8_t len);
+static vio_status_t vio_get_serial_number(char *buf, uint8_t len);
 
 static vio_status_t vio_set_ssr_state(const void *);
 static vio_status_t vio_set_expreq_one_pulse_length(const void *);
@@ -46,6 +47,10 @@ static vio_status_t vio_set_prep_timeus(const void *);
 static vio_status_t vio_set_prep_isrunning(const void *);
 static vio_status_t vio_set_expok_count_zero();
 static vio_status_t vio_set_expok_notify(const void *);
+static vio_status_t vio_set_serial_number(const void *);
+
+static vio_status_t vio_sys_reboot();
+//static vio_status_t vio_sys_dfu();
 
 //this a jump table
 static vio_status_t(*vio_get[])(char *, uint8_t) =
@@ -68,6 +73,7 @@ static vio_status_t(*vio_get[])(char *, uint8_t) =
 		[VIO_CMD_GET_PREP_ISRUNNING] = vio_get_prep_isrunning,
 		[VIO_CMD_GET_EXPOK_COUNT] = vio_get_expok_count,
 		[VIO_CMD_GET_EXPOK_NOTIFY] = vio_get_expok_notify,
+		[VIO_CMD_GET_SERIAL_NUMBER] = vio_get_serial_number,
 };
 
 static vio_status_t(*vio_set[])(const void *) =
@@ -85,6 +91,12 @@ static vio_status_t(*vio_set[])(const void *) =
 	[VIO_CMD_SET_PREP_ISRUNNING] = vio_set_prep_isrunning,
 	[VIO_CMD_SET_EXPOK_COUNT_ZERO] = vio_set_expok_count_zero,
 	[VIO_CMD_SET_EXPOK_NOTIFY] = vio_set_expok_notify,
+	[VIO_CMD_SET_SERIAL_NUMBER] = vio_set_serial_number,
+};
+
+static vio_status_t(*vio_sys[])() =
+{
+	[VIO_CMD_SYS_REBOOT] = vio_sys_reboot,
 };
 
 static vio_status_t vio_is_period_in_range(const uint32_t *);
@@ -120,7 +132,7 @@ void vio_recv_data(const char *inBuf, uint16_t len)
 {
 	vio_status_t result = VIO_STATUS_BAD_COMMAND;
 	char respParam[48] = "";
-	char *pLeftover;
+	char *pLeftover = NULL;
 
 	uint32_t cmd = strtoul(inBuf, &pLeftover, 10);
 
@@ -133,7 +145,7 @@ void vio_recv_data(const char *inBuf, uint16_t len)
 		result = VIO_STATUS_BAD_PARAMETER;  //assume a bad parameter then check
 		if (pLeftover[0] == VIO_COMM_DELIMETER)
 		{
-			char *tail;
+			char *tail = NULL;
 			uint32_t prm = strtoul(pLeftover, &tail, 10);
 			if(tail[0] == VIO_COMM_TERMINATOR)
 			{
@@ -142,9 +154,9 @@ void vio_recv_data(const char *inBuf, uint16_t len)
 			}
 		}
 	}
-	else if((cmd > VIO_CMD_GET_BLOCK_END) && (cmd < VIO_CMD_SET_BLOCK_START))  //Check if it is a Special command
+	else if((cmd > VIO_CMD_GET_BLOCK_END) && (cmd < VIO_CMD_SET_BLOCK_START))  //Check if it is a System command
 	{
-		vio_status_t result = VIO_STATUS_OK;
+		result = vio_sys[cmd]();
 	}
 
 	char resp[64];
@@ -268,6 +280,15 @@ static vio_status_t vio_get_expok_notify(char *buf, uint8_t len)
 	return VIO_STATUS_OK;
 }
 
+static vio_status_t vio_get_serial_number(char *buf, uint8_t len)
+{
+	buf = (char *)FS_Desc.GetSerialStrDescriptor(USBD_SPEED_FULL, (uint16_t *)&len);
+	return VIO_STATUS_OK;
+}
+
+//////////////////////////SET FUNCTIONS/////////////////////////////////////////////////
+
+
 static vio_status_t vio_set_ssr_state(const void *newValue)
 {
 	HAL_GPIO_WritePin(POWER_CONTROL_OUT_GPIO_Port, POWER_CONTROL_OUT_Pin, *(vio_ssr_state_t *)newValue);
@@ -351,7 +372,7 @@ static vio_status_t vio_set_expreq_varpwm_add(const void *newValue)
 
 	result = vio_is_period_in_range((uint32_t *)newValue);
 	if(result == VIO_STATUS_OK)
-		expReq.VarPwm.elements[expReq.VarPwm.count++] = *(uint32_t *)newValue;
+		expReq.VarPwm.elements[expReq.VarPwm.count++] = *(uint16_t *)newValue;
 
 	error:
 	return result;
@@ -373,10 +394,10 @@ static vio_status_t vio_set_prep_isrunning(const void *newValue)
 	vio_status_t result = VIO_STATUS_OK;
 	if(prep.timeUs <= 0)
 		result = VIO_STATUS_PREP_NOT_CONFIGURED;
-	else if(prep.isRunning == true)
+	else if((prep.isRunning == true) && *(bool *)newValue == true)
 		result = VIO_STATUS_PREP_IS_RUNNING;
 	else
-		prep.isRunning = true;
+		prep.isRunning = *(bool *)newValue;
 
 	return result;
 }
@@ -393,21 +414,41 @@ static vio_status_t vio_set_expok_notify(const void *newValue)
 	return VIO_STATUS_OK;
 }
 
+static vio_status_t vio_set_serial_number(const void *newValue)
+{
+	return VIO_STATUS_OK;
+}
+
+static vio_status_t vio_sys_reboot()
+{
+	char msg[16]; //have to send a response here as this will not return to vio_rcv_data
+    snprintf(msg, sizeof(msg), "%d%c%d%c", VIO_CMD_SYS_REBOOT, VIO_COMM_DELIMETER, VIO_STATUS_OK, VIO_COMM_TERMINATOR);
+    vio_send_data(msg, strlen(msg));
+	//NVIC_SystemReset();
+    SCB->AIRCR = (0x5FA<<SCB_AIRCR_VECTKEY_Pos)|SCB_AIRCR_SYSRESETREQ_Msk;
+
+	return VIO_STATUS_OK;
+}
+
 static void vio_send_data(const char *buf, uint8_t len)
 {
 	CDC_Transmit_FS(buf, len);
 }
 
-/**
-  * @brief EXTI line detection callbacks
-  * @param GPIO_Pin: Specifies the pins connected EXTI line
-  * @retval None
-  */
+
+/// @brief EXTI line detection callbacks
+/// @param GPIO_Pin: Specifies the pins connected EXTI line
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if(GPIO_Pin == EXPOSE_OK_IN_Pin)
   {
 	  expOk.count++;
+	  if(expOk.notify)
+	  {
+		  char msg[16];
+		  snprintf(msg, sizeof(msg), "%d%c%lu%c", VIO_STATUS_EXPOSEOK_EVENT, VIO_COMM_DELIMETER, expOk.count, VIO_COMM_TERMINATOR);
+		  vio_send_data(msg, strlen(msg));
+	  }
   }
 }
 
