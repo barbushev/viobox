@@ -113,6 +113,8 @@ static vio_status_t(*vio_sys[])() =
 
 static vio_status_t vio_is_period_in_range(const uint32_t *);
 static void vio_send_data(const char *buf, uint8_t len);
+static bool vio_is_valid_bool(const bool *);
+
 //static void USB_SEND(const char *string, ...);
 
 static vio_expose_request_t expReq =
@@ -182,6 +184,12 @@ void vio_recv_data(const char *inBuf, uint16_t len)
 	snprintf(resp, sizeof(resp), "%lu%c%d%c%s\n", cmd, VIO_COMM_DELIMETER, result, VIO_COMM_DELIMETER, respParam);
 	vio_send_data(resp, strlen(resp));
 }
+
+static bool vio_is_valid_bool(const bool *value)
+{
+	return ((*value == true) || (*value == false));
+}
+
 
 static vio_status_t vio_is_period_in_range(const uint32_t *fPeriodUs)
 {
@@ -322,8 +330,18 @@ static vio_status_t vio_get_serial_number(char *buf, uint8_t len)
 
 static vio_status_t vio_set_ssr_state(const void *newValue)
 {
-	HAL_GPIO_WritePin(POWER_CONTROL_OUT_GPIO_Port, POWER_CONTROL_OUT_Pin, *(vio_ssr_state_t *)newValue);
-	return VIO_STATUS_OK;
+	vio_status_t result = VIO_STATUS_OK;
+	switch(*(vio_ssr_state_t *)newValue)
+	{
+		case VIO_SSR_OPEN:
+		case VIO_SSR_CLOSED:
+			HAL_GPIO_WritePin(POWER_CONTROL_OUT_GPIO_Port, POWER_CONTROL_OUT_Pin, *(vio_ssr_state_t *)newValue);
+			break;
+		default:
+			result = VIO_STATUS_BAD_PARAMETER;
+	}
+
+	return result;
 }
 
 static vio_status_t vio_set_expreq_one_pulse_length(const void *newValue)
@@ -403,14 +421,24 @@ static vio_status_t vio_set_expreq_fixpwm_pwidth(const void *newValue)
 
 static vio_status_t vio_set_expreq_varpwm_looping(const void *newValue)
 {
-	expReq.VarPwm.enableLooping = *(bool *)newValue;
-	return VIO_STATUS_OK;
+	vio_status_t result = VIO_STATUS_OK;
+	if(!vio_is_valid_bool((bool *)newValue))
+		result = VIO_STATUS_BAD_PARAMETER;
+	else
+		expReq.VarPwm.enableLooping = *(bool *)newValue;
+
+	return result;
 }
 
 static vio_status_t vio_set_expreq_varpwm_waitforextsync(const void *newValue)
 {
-	expReq.VarPwm.waitForExtSync = *(bool *)newValue;
-	return VIO_STATUS_OK;
+	vio_status_t result = VIO_STATUS_OK;
+	if(!vio_is_valid_bool((bool *)newValue))
+		result = VIO_STATUS_BAD_PARAMETER;
+	else
+		expReq.VarPwm.waitForExtSync = *(bool *)newValue;
+
+	return result;
 }
 
 static vio_status_t vio_set_expreq_varpwm_empty()
@@ -452,8 +480,13 @@ static vio_status_t vio_set_expreq_varpwm_add(const void *newValue)
 
 static vio_status_t vio_set_expreq_varpwm_notify(const void *newValue)
 {
-	expReq.VarPwm.notify = *(bool *)newValue;
-	return VIO_STATUS_OK;
+	vio_status_t result = VIO_STATUS_OK;
+	if(!vio_is_valid_bool((bool *)newValue))
+		result = VIO_STATUS_BAD_PARAMETER;
+	else
+		expReq.VarPwm.notify = *(bool *)newValue;
+
+	return result;
 }
 
 static vio_status_t	vio_set_prep_timeus(const void *newValue)
@@ -485,8 +518,13 @@ static vio_status_t vio_set_prep_isrunning(const void *newValue)
 
 static vio_status_t vio_set_prep_notify(const void *newValue)
 {
-	prep.notify = *(bool *)newValue;
-	return VIO_STATUS_OK;
+	vio_status_t result = VIO_STATUS_OK;
+	if(!vio_is_valid_bool((bool *)newValue))
+		result = VIO_STATUS_BAD_PARAMETER;
+	else
+		prep.notify = *(bool *)newValue;
+
+	return result;
 }
 
 static vio_status_t vio_set_expok_count_zero()
@@ -497,8 +535,13 @@ static vio_status_t vio_set_expok_count_zero()
 
 static vio_status_t vio_set_expok_notify(const void *newValue)
 {
-	expOk.notify = *(bool *)newValue;
-	return VIO_STATUS_OK;
+	vio_status_t result = VIO_STATUS_OK;
+	if(!vio_is_valid_bool((bool *)newValue))
+		result = VIO_STATUS_BAD_PARAMETER;
+	else
+		expOk.notify = *(bool *)newValue;
+
+	return result;
 }
 
 static vio_status_t vio_set_serial_number(const void *newValue)
