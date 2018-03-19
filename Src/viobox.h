@@ -19,8 +19,8 @@ PATCH version when you make backwards-compatible bug fixes.*/
 const uint8_t VIO_MAJOR_VERSION = 0;
 const uint8_t VIO_MINOR_VERSION = 1;
 const uint8_t VIO_PATCH_VERSION = 5;
-const uint32_t VIO_MIN_PERIOD_US = 10;				/// Minimum pulse length in microseconds
-const uint32_t VIO_MAX_PERIOD_US = 5000;			/// Maximum pulse length in microseconds
+const uint32_t VIO_MIN_PERIOD_US = 1000;			/// Minimum pulse length in microseconds. 1000Hz
+const uint32_t VIO_MAX_PERIOD_US = 10000000;		/// Maximum pulse length in microseconds. 0.1 Hz
 enum{VIO_MAX_VARPWM_SEQUENCE_LENGTH = 5000};		/// Maximum number of elements in the variable pwm queue
 const char VIO_COMM_DELIMETER = ' ';
 const char VIO_COMM_TERMINATOR = '\n';
@@ -39,7 +39,7 @@ typedef enum
 	VIO_STATUS_VARPWM_IS_RUNNING,
 	VIO_STATUS_SEQUENCE_QUEUE_FULL,
 	VIO_STATUS_SEQUENCE_QUEUE_EMPTY,
-	VIO_STATUS_PREP_IS_RUNNING,
+	VIO_STATUS_PREP_ALREADY_RUNNING,
 	VIO_STATUS_PREP_NOT_CONFIGURED,
 	VIO_STATUS_OUT_OF_RANGE,
 	VIO_STATUS_BAD_COMMAND,
@@ -65,8 +65,10 @@ typedef enum
 	VIO_CMD_GET_EXPREQ_VARPWM_NUMLOOPS, 		/// Returns the value of vio_expreq_varpwm_t.numLoops
 	VIO_CMD_GET_EXPREQ_VARPWM_WAITFOREXTSYNC,   /// Returns the value of vio_expreq_varpwm_t.waitForExtSync
 	VIO_CMD_GET_EXPREQ_VARPWM_ELEMENT,          /// Takes a parameter of Element Number. Returns the value of that element if it exists.
+	VIO_CMD_GET_EXPREQ_VARPWM_NOTIFY,
 	VIO_CMD_GET_PREP_TIMEUS,
 	VIO_CMD_GET_PREP_ISRUNNING,
+	VIO_CMD_GET_PREP_NOTIFY,
 	VIO_CMD_GET_EXPOK_COUNT,
 	VIO_CMD_GET_EXPOK_NOTIFY,
 	VIO_CMD_GET_SERIAL_NUMBER,
@@ -87,8 +89,10 @@ typedef enum
 	VIO_CMD_SET_EXPREQ_VARPWM_WAITFOREXTSYNC,
 	VIO_CMD_SET_EXPREQ_VARPWM_EMPTY,           /// Clear all vio_expreq_varpwm_t.elements
 	VIO_CMD_SET_EXPREQ_VARPWM_ADD,			   /// Takes a parameter pulseWidthUs. Adds it to the end of the queue.
+	VIO_CMD_SET_EXPREQ_VARPWM_NOTIFY,
 	VIO_CMD_SET_PREP_TIMEUS,
 	VIO_CMD_SET_PREP_ISRUNNING,
+	VIO_CMD_SET_PREP_NOTIFY,
 	VIO_CMD_SET_EXPOK_COUNT_ZERO,
 	VIO_CMD_SET_EXPOK_NOTIFY,
 	VIO_CMD_SET_SERIAL_NUMBER,
@@ -127,6 +131,7 @@ typedef struct
 	volatile uint32_t numLoops;	    /// Number of completed loops.
 	uint16_t elements[VIO_MAX_VARPWM_SEQUENCE_LENGTH];	/// Sequence pulse widths in microseconds.
 	volatile bool waitForExtSync;   /// Sequence shall wait for external sync before starting.
+	bool notify;					/// Sends a message upon completion of the sequence of pulses. In case of looping, it sends a message upon completing every loop.
 }vio_expreq_varpwm_t;
 
 typedef struct
@@ -142,6 +147,7 @@ typedef struct
 {
 	uint32_t timeUs;                    /// The length of time the prepare output is held high
 	bool	 isRunning;					/// Prepare is currently producing a pulse
+	bool     notify;					/// Sends a message upon completion of output being held high
 }vio_prepare_t;
 
 typedef struct
@@ -149,5 +155,8 @@ typedef struct
 	volatile uint32_t count;			/// Number of Falling edges detected so far.
 	bool notify;						/// When set to true, it sends a message every time a Falling edge is detected.
 }vio_exposeok_t;
+
+void vio_init();
+void vio_recv_data(const char *inBuf, uint16_t len);
 
 #endif /* VIOBOX_H_ */

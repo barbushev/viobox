@@ -14,6 +14,10 @@
 #include "usbd_cdc_if.h"
 #include "usbd_desc.h"
 
+#include "exp_req_ctrl.h"
+
+#define __HAL_TIM_GET_PRESCALER(__HANDLE__)       ((__HANDLE__)->Instance->PSC)
+
 static vio_status_t vio_get_fw_ver(char *buf, uint8_t len);
 static vio_status_t vio_get_min_period_us(char *buf, uint8_t len);
 static vio_status_t vio_get_max_period_us(char *buf, uint8_t len);
@@ -28,8 +32,10 @@ static vio_status_t vio_get_expreq_varpwm_position(char *buf, uint8_t len);
 static vio_status_t vio_get_expreq_varpwm_looping(char *buf, uint8_t len);
 static vio_status_t vio_get_expreq_varpwm_numloops(char *buf, uint8_t len);
 static vio_status_t vio_get_expreq_varpwm_waitforextsync(char *buf, uint8_t len);
+static vio_status_t vio_get_expreq_varpwm_notify(char *buf, uint8_t len);
 static vio_status_t vio_get_prep_timeus(char *buf, uint8_t len);
 static vio_status_t vio_get_prep_isrunning(char *buf, uint8_t len);
+static vio_status_t vio_get_prep_notify(char *buf, uint8_t len);
 static vio_status_t vio_get_expok_count(char *buf, uint8_t len);
 static vio_status_t vio_get_expok_notify(char *buf, uint8_t len);
 static vio_status_t vio_get_serial_number(char *buf, uint8_t len);
@@ -43,8 +49,10 @@ static vio_status_t vio_set_expreq_varpwm_looping(const void *);
 static vio_status_t vio_set_expreq_varpwm_waitforextsync(const void *);
 static vio_status_t vio_set_expreq_varpwm_empty();
 static vio_status_t vio_set_expreq_varpwm_add(const void *);
+static vio_status_t vio_set_expreq_varpwm_notify(const void *);
 static vio_status_t vio_set_prep_timeus(const void *);
 static vio_status_t vio_set_prep_isrunning(const void *);
+static vio_status_t vio_set_prep_notify(const void *);
 static vio_status_t vio_set_expok_count_zero();
 static vio_status_t vio_set_expok_notify(const void *);
 static vio_status_t vio_set_serial_number(const void *);
@@ -69,8 +77,10 @@ static vio_status_t(*vio_get[])(char *, uint8_t) =
 		[VIO_CMD_GET_EXPREQ_VARPWM_LOOPING] = vio_get_expreq_varpwm_looping,
 		[VIO_CMD_GET_EXPREQ_VARPWM_NUMLOOPS] = vio_get_expreq_varpwm_numloops,
 		[VIO_CMD_GET_EXPREQ_VARPWM_WAITFOREXTSYNC] = vio_get_expreq_varpwm_waitforextsync,
+		[VIO_CMD_GET_EXPREQ_VARPWM_NOTIFY] = vio_get_expreq_varpwm_notify,
 		[VIO_CMD_GET_PREP_TIMEUS] = vio_get_prep_timeus,
 		[VIO_CMD_GET_PREP_ISRUNNING] = vio_get_prep_isrunning,
+		[VIO_CMD_GET_PREP_NOTIFY] = vio_get_prep_notify,
 		[VIO_CMD_GET_EXPOK_COUNT] = vio_get_expok_count,
 		[VIO_CMD_GET_EXPOK_NOTIFY] = vio_get_expok_notify,
 		[VIO_CMD_GET_SERIAL_NUMBER] = vio_get_serial_number,
@@ -87,8 +97,10 @@ static vio_status_t(*vio_set[])(const void *) =
 	[VIO_CMD_SET_EXPREQ_VARPWM_WAITFOREXTSYNC] = vio_set_expreq_varpwm_waitforextsync,
 	[VIO_CMD_SET_EXPREQ_VARPWM_EMPTY] = vio_set_expreq_varpwm_empty,            /// Clear all vio_expreq_varpwm_t.elements
 	[VIO_CMD_SET_EXPREQ_VARPWM_ADD] = vio_set_expreq_varpwm_add,			    /// Takes a parameter pulseWidthUs. Adds it to the end of the queue.
+	[VIO_CMD_SET_EXPREQ_VARPWM_NOTIFY] = vio_set_expreq_varpwm_notify,
 	[VIO_CMD_SET_PREP_TIMEUS] = vio_set_prep_timeus,
 	[VIO_CMD_SET_PREP_ISRUNNING] = vio_set_prep_isrunning,
+	[VIO_CMD_SET_PREP_NOTIFY] = vio_set_prep_notify,
 	[VIO_CMD_SET_EXPOK_COUNT_ZERO] = vio_set_expok_count_zero,
 	[VIO_CMD_SET_EXPOK_NOTIFY] = vio_set_expok_notify,
 	[VIO_CMD_SET_SERIAL_NUMBER] = vio_set_serial_number,
@@ -114,12 +126,14 @@ static vio_expose_request_t expReq =
 	.VarPwm.enableLooping = false,
 	.VarPwm.numLoops = 0,
 	.VarPwm.waitForExtSync = false,
+	.VarPwm.notify = false,
 };
 
 static vio_prepare_t prep =
 {
 		.timeUs = 0,
 		.isRunning = false,
+		.notify = false,
 };
 
 static vio_exposeok_t expOk =
@@ -127,6 +141,11 @@ static vio_exposeok_t expOk =
 		.count = 0,
 		.notify = false,
 };
+
+void vio_init()
+{
+	exp_req_init();
+}
 
 void vio_recv_data(const char *inBuf, uint16_t len)
 {
@@ -256,6 +275,12 @@ static vio_status_t vio_get_expreq_varpwm_waitforextsync(char *buf, uint8_t len)
 	return VIO_STATUS_OK;
 }
 
+static vio_status_t vio_get_expreq_varpwm_notify(char *buf, uint8_t len)
+{
+	snprintf(buf, len, "%d", expReq.VarPwm.notify);
+	return VIO_STATUS_OK;
+}
+
 static vio_status_t vio_get_prep_timeus(char *buf, uint8_t len)
 {
 	snprintf(buf, len, "%lu", prep.timeUs);
@@ -265,6 +290,12 @@ static vio_status_t vio_get_prep_timeus(char *buf, uint8_t len)
 static vio_status_t vio_get_prep_isrunning(char *buf, uint8_t len)
 {
 	snprintf(buf, len, "%d", prep.isRunning);
+	return VIO_STATUS_OK;
+}
+
+static vio_status_t vio_get_prep_notify(char *buf, uint8_t len)
+{
+	snprintf(buf, len, "%d", prep.notify);
 	return VIO_STATUS_OK;
 }
 
@@ -308,14 +339,49 @@ static vio_status_t vio_set_expreq_state(const void *newValue)
 {
 	vio_status_t result = VIO_STATUS_OK;
 
+	switch(*(vio_expreq_state_t *)newValue)
+	{
+		case VIO_EXPREQ_IDLE:
+			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+			break;
+
+		case VIO_EXPREQ_ONE_PULSE:
+			break;
+
+		case VIO_EXPREQ_FIXED_PWM:
+			HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+			break;
+
+		case VIO_EXPREQ_VARIABLE_PWM:
+			break;
+
+		default:
+			result = VIO_STATUS_BAD_PARAMETER;
+	}
+
 	return result;
 }
 
 static vio_status_t vio_set_expreq_frequency(const void *newValue)
 {
 	vio_status_t result = vio_is_period_in_range((uint32_t *)newValue);
-	if (result == VIO_STATUS_OK)
+	if(result == VIO_STATUS_OK)
+	{
 		expReq.fPeriodUs = *(uint32_t *)newValue;
+		static const uint32_t TIMER_RESOLUTION = 65536;
+
+		uint32_t cycles = (HAL_RCC_GetPCLK2Freq() / (1000000.0 / *(uint32_t *)newValue));  //1000000 / microseconds - converting back to Hz
+		uint32_t prescaler = (cycles / TIMER_RESOLUTION) - 1;
+		if(cycles % TIMER_RESOLUTION != 0) prescaler++;  //if there was a left over, increment by 1
+		uint32_t period = (float)cycles / (float)(prescaler + 1); //perform division as float and add 1 back to prescaler.
+
+		__HAL_TIM_SET_PRESCALER(&htim1, prescaler);
+		__HAL_TIM_SET_AUTORELOAD(&htim1, period);
+
+		char buf[64];   //the stuff below is used for debugging. Will remove later.
+		snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, prescaler, period);
+		CDC_Transmit_FS(buf, strlen(buf));
+	}
 
 	return result;
 }
@@ -324,7 +390,13 @@ static vio_status_t vio_set_expreq_fixpwm_pwidth(const void *newValue)
 {
 	vio_status_t result = vio_is_period_in_range((uint32_t *)newValue);
 	if (result == VIO_STATUS_OK)
+	{
+		uint32_t cycles = (HAL_RCC_GetPCLK2Freq() / (1000000.0 / *(uint32_t *)newValue));
+		uint32_t period = (float)cycles / (float)(__HAL_TIM_GET_PRESCALER(&htim1) + 1);
+
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, period);
 		expReq.FixedPwm.widthUs = *(uint32_t *)newValue;
+	}
 
 	return result;
 }
@@ -378,11 +450,17 @@ static vio_status_t vio_set_expreq_varpwm_add(const void *newValue)
 	return result;
 }
 
+static vio_status_t vio_set_expreq_varpwm_notify(const void *newValue)
+{
+	expReq.VarPwm.notify = *(bool *)newValue;
+	return VIO_STATUS_OK;
+}
+
 static vio_status_t	vio_set_prep_timeus(const void *newValue)
 {
 	vio_status_t result = VIO_STATUS_OK;
 	if(prep.isRunning == true)
-		result = VIO_STATUS_PREP_IS_RUNNING;
+		result = VIO_STATUS_PREP_ALREADY_RUNNING;
 	else
 		prep.timeUs = *(uint32_t *)newValue;
 
@@ -395,11 +473,20 @@ static vio_status_t vio_set_prep_isrunning(const void *newValue)
 	if(prep.timeUs <= 0)
 		result = VIO_STATUS_PREP_NOT_CONFIGURED;
 	else if((prep.isRunning == true) && *(bool *)newValue == true)
-		result = VIO_STATUS_PREP_IS_RUNNING;
+		result = VIO_STATUS_PREP_ALREADY_RUNNING;
 	else
+	{
 		prep.isRunning = *(bool *)newValue;
 
+	}
+
 	return result;
+}
+
+static vio_status_t vio_set_prep_notify(const void *newValue)
+{
+	prep.notify = *(bool *)newValue;
+	return VIO_STATUS_OK;
 }
 
 static vio_status_t vio_set_expok_count_zero()
@@ -424,9 +511,9 @@ static vio_status_t vio_sys_reboot()
 	char msg[16]; //have to send a response here as this will not return to vio_rcv_data
     snprintf(msg, sizeof(msg), "%d%c%d%c", VIO_CMD_SYS_REBOOT, VIO_COMM_DELIMETER, VIO_STATUS_OK, VIO_COMM_TERMINATOR);
     vio_send_data(msg, strlen(msg));
-	//NVIC_SystemReset();
-    SCB->AIRCR = (0x5FA<<SCB_AIRCR_VECTKEY_Pos)|SCB_AIRCR_SYSRESETREQ_Msk;
+    HAL_Delay(100);
 
+    NVIC_SystemReset();
 	return VIO_STATUS_OK;
 }
 
@@ -452,6 +539,44 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   }
 }
 
+void calc()
+{
+	// Tim1 is clocked for APB2 which is currently configured to run at the same speed as the CPU = 72 MHz
+	// APB2 clock may be divided using TIM_CLOCKDIVISION_DIVx where x values may be are APB2/1, APB2/2 or APB2/4
+	// After that, the clock is scaled using Prescaler. This value should be such that the period has the highest value without overflowing.
+	// Note that prescaler is value is always (- 1) since it starts at 0. Eg. 0 is actually a prescale of 1. 3 is acutally a prescale of 4...
+	// Example for 10 Hz PWM. 10 Hz = 100000 us. microsec = 100000
+
+	// Calculate cycles
+    // Without using the divider, 72 000 000 / (1000000 / microsec) = 72 000 000 / 10 = 7 200 000
+
+	// Calculate prescaler
+	// prescaler = cycles /  (16bit timer) = 7 200 000 / 65536 = 109.86328125.
+	// Since there is a leftover, round up so it will not overflow and then subtract 1.
+	// prescaler = 109.86328125 = round up to 110 - 1 = 109.
+
+	// Calculate period
+	// period = cycles / prescaler = 7 200 000 / 110 = 65454.54
+
+	//__HAL_TIM_SET_COUNTER  // may use this to reset to 0?
+
+	//_HAL_TIM_SET_PRESCALER
+	//__HAL_TIM_SET_AUTORELOAD(&htim1, *(uint32_t *)newValue);
+
+	//__HAL_TIM_ENABLE
+
+	/*
+	static const uint32_t TIMER_RESOLUTION = 65536;
+
+	uint32_t microseconds = 100;
+
+	uint32_t cycles = (HAL_RCC_GetPCLK2Freq() / (1000000.0 / microseconds));  //1000000 / microseconds - converting back to Hz
+	uint32_t prescaler = (cycles / TIMER_RESOLUTION) - 1;
+	if(cycles % TIMER_RESOLUTION != 0) prescaler++;  //if there was a left over, increment by 1
+
+	uint32_t period = cycles / prescaler;
+	*/
+}
 
 /*
 static void USB_SEND(const char *string, ...)
