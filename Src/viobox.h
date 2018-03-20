@@ -10,20 +10,7 @@
 
 #include "stdint.h"
 
-/*
-MAJOR.MINOR.PATCH, increment the:
-MAJOR version when you make incompatible API changes,
-MINOR version when you add functionality in a backwards-compatible manner, and
-PATCH version when you make backwards-compatible bug fixes.*/
-
-const uint8_t VIO_MAJOR_VERSION = 0;
-const uint8_t VIO_MINOR_VERSION = 1;
-const uint8_t VIO_PATCH_VERSION = 5;
-const uint32_t VIO_MIN_PERIOD_US = 1000;			/// Minimum pulse length in microseconds. 1000Hz
-const uint32_t VIO_MAX_PERIOD_US = 10000000;		/// Maximum pulse length in microseconds. 0.1 Hz
-enum{VIO_MAX_VARPWM_SEQUENCE_LENGTH = 5000};		/// Maximum number of elements in the variable pwm queue
-const char VIO_COMM_DELIMETER = ' ';
-const char VIO_COMM_TERMINATOR = '\n';
+enum{VIO_EXPREQ_MAX_SEQUENCE_LENGTH = 5000}; /// Maximum number of elements in the variable pwm queue
 
 typedef enum
 {
@@ -51,10 +38,10 @@ typedef enum
 	// GET commands
 	VIO_CMD_GET_BLOCK_START,				   /// Marks the start of GET block. Returns VIO_STATUS_BAD_COMMAND.
 	VIO_CMD_GET_FW_VER,
-	VIO_CMD_GET_MIN_PERIOD_US,
-	VIO_CMD_GET_MAX_PERIOD_US,
-	VIO_CMD_GET_MAX_SEQUENCE_LENGTH,
 	VIO_CMD_GET_SSR_STATE,
+	VIO_CMD_GET_EXPREQ_MIN_PERIOD_US,
+	VIO_CMD_GET_EXPREQ_MAX_PERIOD_US,
+	VIO_CMD_GET_EXPREQ_MAX_SEQUENCE_LENGTH,
 	VIO_CMD_GET_EXPREQ_STATE,
 	VIO_CMD_GET_EXPREQ_FREQUENCY,
 	VIO_CMD_GET_EXPREQ_ONE_PULSE_LENGTH,
@@ -66,7 +53,9 @@ typedef enum
 	VIO_CMD_GET_EXPREQ_VARPWM_WAITFOREXTSYNC,   /// Returns the value of vio_expreq_varpwm_t.waitForExtSync
 	VIO_CMD_GET_EXPREQ_VARPWM_ELEMENT,          /// Takes a parameter of Element Number. Returns the value of that element if it exists.
 	VIO_CMD_GET_EXPREQ_VARPWM_NOTIFY,
-	VIO_CMD_GET_PREP_TIMEUS,
+	VIO_CMD_GET_PREP_MIN_TIME_US,
+	VIO_CMD_GET_PREP_MAX_TIME_US,
+	VIO_CMD_GET_PREP_TIME_US,
 	VIO_CMD_GET_PREP_ISRUNNING,
 	VIO_CMD_GET_PREP_NOTIFY,
 	VIO_CMD_GET_EXPOK_COUNT,
@@ -129,7 +118,7 @@ typedef struct
 	uint16_t position;	      		/// Current position of the sequence.
 	bool enableLooping;  		    /// Indicates if looping is enabled.
 	volatile uint32_t numLoops;	    /// Number of completed loops.
-	uint16_t elements[VIO_MAX_VARPWM_SEQUENCE_LENGTH];	/// Sequence pulse widths in microseconds.
+	uint16_t elements[VIO_EXPREQ_MAX_SEQUENCE_LENGTH];	/// Sequence pulse widths in microseconds.
 	volatile bool waitForExtSync;   /// Sequence shall wait for external sync before starting.
 	bool notify;					/// Sends a message upon completion of the sequence of pulses. In case of looping, it sends a message upon completing every loop.
 }vio_expreq_varpwm_t;
@@ -158,5 +147,6 @@ typedef struct
 
 void vio_init();
 void vio_recv_data(const char *inBuf, uint16_t len);
+bool vio_is_valid_bool(const bool *value);
 
 #endif /* VIOBOX_H_ */
