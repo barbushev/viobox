@@ -24,4 +24,6 @@ vio_status_t vio_set_prep_timeus(const void *);
 vio_status_t vio_set_prep_isrunning(const void *);
 vio_status_t vio_set_prep_notify(const void *);
 
+void vio_prep_irq_callback();
+
 #endif /* VIO_PREP_H_ */

@@ -37,4 +37,6 @@ vio_status_t vio_set_expreq_varpwm_empty();
 vio_status_t vio_set_expreq_varpwm_add(const void *);
 vio_status_t vio_set_expreq_varpwm_notify(const void *);
 
+void vio_expreq_irq_callback();
+
 #endif /* VIO_EXP_REQ_H_ */

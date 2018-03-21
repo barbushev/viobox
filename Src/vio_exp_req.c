@@ -16,6 +16,10 @@
 static const uint32_t VIO_EXPREQ_MIN_PERIOD_US = 1000;			/// Minimum pulse length in microseconds. 1000Hz
 static const uint32_t VIO_EXPREQ_MAX_PERIOD_US = 10000000;		/// Maximum pulse length in microseconds. 0.1 Hz
 
+extern const char VIO_COMM_DELIMETER;
+extern const char VIO_COMM_TERMINATOR;
+
+
 static TIM_HandleTypeDef htim1;
 
 static vio_expose_request_t expReq =
@@ -304,7 +308,7 @@ vio_status_t vio_set_expreq_varpwm_empty()
 {
 	vio_status_t result = VIO_STATUS_OK;
 	if (expReq.State == VIO_EXPREQ_VARIABLE_PWM)
-		result = VIO_STATUS_VARPWM_IS_RUNNING;
+		result = VIO_STATUS_EXPREQ_VARPWM_IS_RUNNING;
 	else
 	{
 		memset(expReq.VarPwm.elements, 0, VIO_EXPREQ_MAX_SEQUENCE_LENGTH);
@@ -319,13 +323,13 @@ vio_status_t vio_set_expreq_varpwm_add(const void *newValue)
 	vio_status_t result = VIO_STATUS_OK;
 	if((expReq.VarPwm.count >= VIO_EXPREQ_MAX_SEQUENCE_LENGTH))
 	{
-		result = VIO_STATUS_SEQUENCE_QUEUE_FULL;
+		result = VIO_STATUS_EXPREQ_VARPWM_SEQUENCE_FULL;
 		goto error;
 	}
 
 	if(expReq.State == VIO_EXPREQ_VARIABLE_PWM)
 	{
-		result = VIO_STATUS_VARPWM_IS_RUNNING;
+		result = VIO_STATUS_EXPREQ_VARPWM_IS_RUNNING;
 		goto error;
 	}
 
@@ -354,4 +358,30 @@ static vio_status_t vio_is_period_in_range(const uint32_t *fPeriodUs)
 		return VIO_STATUS_OUT_OF_RANGE;
 
 	return VIO_STATUS_OK;
+}
+
+void TIM1_CC_IRQHandler(void)
+{
+  HAL_TIM_IRQHandler(&htim1);
+}
+
+void vio_expreq_irq_callback()
+{
+	///on completion of each loop
+	if((expReq.VarPwm.notify == true) && (expReq.State == VIO_EXPREQ_VARIABLE_PWM))
+	{
+		char msg[16];
+		if(expReq.VarPwm.enableLooping == false)
+			snprintf(msg, sizeof(msg), "%d%c", VIO_STATUS_EXPREQ_COMPLETED, VIO_COMM_TERMINATOR);
+		else
+			snprintf(msg, sizeof(msg), "%d%c%lu%c", VIO_STATUS_EXPREQ_LOOP_NUM, VIO_COMM_DELIMETER, expReq.VarPwm.numLoops, VIO_COMM_TERMINATOR);
+
+		vio_send_data(msg, strlen(msg));
+	}
+
+	if((expReq.State == VIO_EXPREQ_ONE_PULSE) || (expReq.State == VIO_EXPREQ_FIXED_PWM))
+		expReq.State = VIO_EXPREQ_IDLE;
+
+	if((expReq.State == VIO_EXPREQ_VARIABLE_PWM) && (expReq.VarPwm.enableLooping == false))
+		expReq.State = VIO_EXPREQ_IDLE;
 }

@@ -39,7 +39,6 @@ static vio_status_t vio_set_serial_number(const void *);
 
 static vio_status_t vio_sys_reboot();
 //static vio_status_t vio_sys_dfu();
-static void vio_send_data(const char *buf, uint8_t len);
 
 //this a jump table
 static vio_status_t(*vio_get[])(char *, uint8_t) =
@@ -196,11 +195,6 @@ static vio_status_t vio_set_ssr_state(const void *newValue)
 	return result;
 }
 
-
-
-
-
-
 static vio_status_t vio_set_expok_count_zero()
 {
 	expOk.count = 0;
@@ -234,7 +228,7 @@ static vio_status_t vio_sys_reboot()
 	return VIO_STATUS_OK;
 }
 
-static void vio_send_data(const char *buf, uint8_t len)
+void vio_send_data(const char *buf, uint8_t len)
 {
 	CDC_Transmit_FS(buf, len);
 }
@@ -247,7 +241,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   if(GPIO_Pin == EXPOSE_OK_IN_Pin)
   {
 	  expOk.count++;
-	  if(expOk.notify)
+	  if(expOk.notify == true)
 	  {
 		  char msg[16];
 		  snprintf(msg, sizeof(msg), "%d%c%lu%c", VIO_STATUS_EXPOSEOK_EVENT, VIO_COMM_DELIMETER, expOk.count, VIO_COMM_TERMINATOR);

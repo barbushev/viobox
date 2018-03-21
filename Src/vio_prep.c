@@ -6,6 +6,7 @@
  */
 #include "viobox.h"
 #include "vio_prep.h"
+#include "string.h"
 #include "stm32f1xx_hal.h"
 
 #define PREPARE_OUT_Pin GPIO_PIN_15
@@ -13,6 +14,7 @@
 
 static const uint32_t VIO_PREP_MIN_PERIOD_US = 1000;			/// Minimum pulse length in microseconds. 1000Hz
 static const uint32_t VIO_PREP_MAX_PERIOD_US = 100000000;		/// Maximum pulse length in microseconds. 0.01 Hz  (100 sec)
+extern const char VIO_COMM_TERMINATOR;
 
 static TIM_HandleTypeDef htim2;
 static vio_prepare_t prep =
@@ -149,4 +151,27 @@ vio_status_t vio_set_prep_notify(const void *newValue)
 		prep.notify = *(bool *)newValue;
 
 	return result;
+}
+
+void vio_prep_irq_callback()
+{
+
+}
+
+void TIM2_IRQHandler(void)
+{
+  HAL_TIM_IRQHandler(&htim2);
+  prep.isRunning = false;
+
+  if(prep.notify == true)
+  {
+  	char msg[16];
+  	snprintf(msg, sizeof(msg), "%d%c", VIO_STATUS_PREP_COMPLETED, VIO_COMM_TERMINATOR);
+  	vio_send_data(msg, strlen(msg));
+  }
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+
 }
