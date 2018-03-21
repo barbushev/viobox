@@ -24,13 +24,13 @@ static vio_prepare_t prep =
 		.notify = false,
 };
 
+static vio_status_t vio_prep_is_period_in_range(const uint32_t *fPeriodUs);
+
 vio_status_t vio_prep_init()
 {
 	//TIM2 is clocked from APB1. APB1 timer clock is configured to run at 72 MHz
 	//Since prep requires longer periods, we divide the clock by 4. 72 / 4 = 18.
-
-	  TIM_MasterConfigTypeDef sMasterConfig;
-	  TIM_OC_InitTypeDef sConfigOC;
+	TIM_OnePulse_InitTypeDef sConfigOC;
 
 	  htim2.Instance = TIM2;
 	  htim2.Init.Prescaler = 35999;
@@ -38,30 +38,20 @@ vio_status_t vio_prep_init()
 	  htim2.Init.Period = 0;
 	  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV4;  // 72MHz / 4 = 18
 	  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-	  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)   //HAL_TIM_Base_Init
-	  {
-	    _Error_Handler(__FILE__, __LINE__);
-	  }
-
 	  if (HAL_TIM_OnePulse_Init(&htim2, TIM_OPMODE_SINGLE) != HAL_OK)
 	  {
-	    _Error_Handler(__FILE__, __LINE__);
-	  }
-
-	  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-	  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-	  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-	  {
-	    _Error_Handler(__FILE__, __LINE__);
+		  _Error_Handler(__FILE__, __LINE__);
 	  }
 
 	  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-	  sConfigOC.Pulse = 0;
+	  sConfigOC.Pulse = 0;   //no pulse width
 	  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-	  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-	  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+	  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+	  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+	  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+	  if(HAL_TIM_OnePulse_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1, TIM_CHANNEL_2) != HAL_OK)
 	  {
-	    _Error_Handler(__FILE__, __LINE__);
+		  _Error_Handler(__FILE__, __LINE__);
 	  }
 
 	  ///TIM2 GPIO Configuration   PA15     ------> TIM2_CH1
@@ -115,6 +105,9 @@ vio_status_t vio_set_prep_timeus(const void *newValue)
 	if(prep.isRunning == true)
 		result = VIO_STATUS_PREP_ALREADY_RUNNING;
 	else
+		result = vio_prep_is_period_in_range((uint32_t *)newValue);
+
+	if(result == VIO_STATUS_OK)
 		prep.timeUs = *(uint32_t *)newValue;
 
 	return result;
@@ -151,6 +144,14 @@ vio_status_t vio_set_prep_notify(const void *newValue)
 		prep.notify = *(bool *)newValue;
 
 	return result;
+}
+
+static vio_status_t vio_prep_is_period_in_range(const uint32_t *fPeriodUs)
+{
+	if(((*fPeriodUs < VIO_PREP_MIN_PERIOD_US) || (*fPeriodUs > VIO_PREP_MAX_PERIOD_US)))
+		return VIO_STATUS_OUT_OF_RANGE;
+
+	return VIO_STATUS_OK;
 }
 
 void vio_prep_irq_callback()

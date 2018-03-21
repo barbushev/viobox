@@ -36,7 +36,7 @@ static vio_expose_request_t expReq =
 	.VarPwm.notify = false,
 };
 
-static vio_status_t vio_is_period_in_range(const uint32_t *fPeriodUs);
+static vio_status_t vio_expreq_is_period_in_range(const uint32_t *fPeriodUs);
 
 vio_status_t vio_exp_req_init()
 {
@@ -209,7 +209,7 @@ vio_status_t vio_get_expreq_varpwm_notify(char *buf, uint8_t len)
 
 vio_status_t vio_set_expreq_one_pulse_length(const void *newValue)
 {
-	vio_status_t result = vio_is_period_in_range((uint32_t *)newValue);
+	vio_status_t result = vio_expreq_is_period_in_range((uint32_t *)newValue);
 	if (result == VIO_STATUS_OK)
 		expReq.OnePulse.lengthUs = *(uint32_t *)newValue;
 
@@ -245,7 +245,7 @@ vio_status_t vio_set_expreq_state(const void *newValue)
 
 vio_status_t vio_set_expreq_frequency(const void *newValue)
 {
-	vio_status_t result = vio_is_period_in_range((uint32_t *)newValue);
+	vio_status_t result = vio_expreq_is_period_in_range((uint32_t *)newValue);
 	if(result == VIO_STATUS_OK)
 	{
 		expReq.fPeriodUs = *(uint32_t *)newValue;
@@ -269,7 +269,7 @@ vio_status_t vio_set_expreq_frequency(const void *newValue)
 
 vio_status_t vio_set_expreq_fixpwm_pwidth(const void *newValue)
 {
-	vio_status_t result = vio_is_period_in_range((uint32_t *)newValue);
+	vio_status_t result = vio_expreq_is_period_in_range((uint32_t *)newValue);
 	if (result == VIO_STATUS_OK)
 	{
 		uint32_t cycles = (HAL_RCC_GetPCLK2Freq() / (1000000.0 / *(uint32_t *)newValue));
@@ -333,7 +333,7 @@ vio_status_t vio_set_expreq_varpwm_add(const void *newValue)
 		goto error;
 	}
 
-	result = vio_is_period_in_range((uint32_t *)newValue);
+	result = vio_expreq_is_period_in_range((uint32_t *)newValue);
 	if(result == VIO_STATUS_OK)
 		expReq.VarPwm.elements[expReq.VarPwm.count++] = *(uint16_t *)newValue;
 
@@ -352,7 +352,7 @@ vio_status_t vio_set_expreq_varpwm_notify(const void *newValue)
 	return result;
 }
 
-static vio_status_t vio_is_period_in_range(const uint32_t *fPeriodUs)
+static vio_status_t vio_expreq_is_period_in_range(const uint32_t *fPeriodUs)
 {
 	if(((*fPeriodUs < VIO_EXPREQ_MIN_PERIOD_US) || (*fPeriodUs > VIO_EXPREQ_MAX_PERIOD_US)))
 		return VIO_STATUS_OUT_OF_RANGE;

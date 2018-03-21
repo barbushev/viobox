@@ -20,7 +20,7 @@ typedef enum
 
 typedef enum
 {
-	VIO_STATUS_OK,
+	VIO_STATUS_OK = 0,
 	VIO_STATUS_EXPOSEOK_EVENT,
 	VIO_STATUS_GENERIC_ERROR,
 	VIO_STATUS_EXPREQ_VARPWM_IS_RUNNING,
@@ -39,7 +39,7 @@ typedef enum
 typedef enum
 {
 	// GET commands
-	VIO_CMD_GET_BLOCK_START,				   /// Marks the start of GET block. Returns VIO_STATUS_BAD_COMMAND.
+	VIO_CMD_GET_BLOCK_START = 0,				   /// Marks the start of GET block. Returns VIO_STATUS_BAD_COMMAND.
 	VIO_CMD_GET_FW_VER,
 	VIO_CMD_GET_SSR_STATE,
 	VIO_CMD_GET_EXPREQ_MIN_PERIOD_US,
