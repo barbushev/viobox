@@ -149,7 +149,7 @@ int main(void)
   {
 
   /* USER CODE END WHILE */
-
+  vio_process();
   /* USER CODE BEGIN 3 */
 
   }

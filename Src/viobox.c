@@ -57,6 +57,7 @@ static vio_status_t(*vio_get[])(char *, uint8_t) =
 	[VIO_CMD_GET_EXPREQ_VARPWM_LOOPING] = vio_get_expreq_varpwm_looping,
 	[VIO_CMD_GET_EXPREQ_VARPWM_NUMLOOPS] = vio_get_expreq_varpwm_numloops,
 	[VIO_CMD_GET_EXPREQ_VARPWM_WAITFOREXTSYNC] = vio_get_expreq_varpwm_waitforextsync,
+	[VIO_CMD_GET_EXPREQ_VARPWM_LIST] = vio_get_expreq_varpwm_list,
 	[VIO_CMD_GET_EXPREQ_VARPWM_NOTIFY] = vio_get_expreq_varpwm_notify,
 	[VIO_CMD_GET_PREP_MIN_TIME_US] = vio_get_prep_min_time_us,
 	[VIO_CMD_GET_PREP_MAX_TIME_US] = vio_get_prep_max_time_us,
@@ -99,10 +100,18 @@ static vio_exposeok_t expOk =
 		.notify = false,
 };
 
+
+//called once during boot to initialize hardware
 void vio_init()
 {
 	vio_exp_req_init();
 	vio_prep_init();
+}
+
+//has to be called periodically to process queued work
+void vio_process()
+{
+	vio_expreq_process();
 }
 
 void vio_recv_data(const char *inBuf, uint16_t len)
@@ -144,6 +153,14 @@ void vio_recv_data(const char *inBuf, uint16_t len)
 bool vio_is_valid_bool(const bool *value)
 {
 	return ((*value == true) || (*value == false));
+}
+
+vio_status_t vio_is_value_in_range(const uint32_t *value, const uint32_t *minValue, const uint32_t *maxValue)
+{
+	if((*value >= *minValue) && (*value <= *maxValue))
+		return VIO_STATUS_OK;
+	else
+		return VIO_STATUS_OUT_OF_RANGE;
 }
 
 static vio_status_t vio_get_fw_ver(char *buf, uint8_t len)
@@ -228,9 +245,20 @@ static vio_status_t vio_sys_reboot()
 	return VIO_STATUS_OK;
 }
 
-void vio_send_data(const char *buf, uint8_t len)
+vio_status_t vio_send_data(const char *buf, uint8_t len)
 {
-	CDC_Transmit_FS(buf, len);
+	uint8_t result = CDC_Transmit_FS(buf, len);
+	switch(result)
+	{
+	case USBD_OK:
+		return VIO_STATUS_OK;
+		break;
+	case USBD_BUSY:
+		return VIO_STATUS_SYS_BUSY;
+	case USBD_FAIL:
+	default:
+		return VIO_STATUS_SYS_ERROR;
+	}
 }
 
 

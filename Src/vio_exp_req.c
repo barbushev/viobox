@@ -13,14 +13,17 @@
 
 #define EXPOSE_REQUEST_OUT_Pin GPIO_PIN_8
 #define EXPOSE_REQUEST_OUT_GPIO_Port GPIOA
-static const uint32_t VIO_EXPREQ_MIN_PERIOD_US = 1000;			/// Minimum pulse length in microseconds. 1000Hz
-static const uint32_t VIO_EXPREQ_MAX_PERIOD_US = 10000000;		/// Maximum pulse length in microseconds. 0.1 Hz
+static const uint32_t VIO_EXPREQ_MIN_PERIOD_US = 1000;			/// Minimum period length in microseconds. 1000Hz
+static const uint32_t VIO_EXPREQ_MAX_PERIOD_US = 10000000;		/// Maximum period length in microseconds. 0.1 Hz
+static const uint32_t VIO_EXPREQ_MIN_PULSE_US = 1;				/// Minimum pulse width in microseconds.
+static const uint32_t VIO_EXPREQ_MAX_PULSE_US = 10000001;		/// Maximum pulse width in microseconds. 0.1 Hz
 
 extern const char VIO_COMM_DELIMETER;
 extern const char VIO_COMM_TERMINATOR;
 
 
 static TIM_HandleTypeDef htim1;
+static bool process_send_varpwm_list = false;
 
 static vio_expose_request_t expReq =
 {
@@ -35,8 +38,6 @@ static vio_expose_request_t expReq =
 	.VarPwm.waitForExtSync = false,
 	.VarPwm.notify = false,
 };
-
-static vio_status_t vio_expreq_is_period_in_range(const uint32_t *fPeriodUs);
 
 vio_status_t vio_exp_req_init()
 {
@@ -123,7 +124,42 @@ vio_status_t vio_exp_req_init()
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
   HAL_GPIO_Init(EXPOSE_REQUEST_OUT_GPIO_Port, &GPIO_InitStruct);
 
+  HAL_NVIC_SetPriority(TIM1_CC_IRQn, 15, 0);
+  HAL_NVIC_EnableIRQ(TIM1_CC_IRQn);
+
   return VIO_STATUS_OK;
+}
+
+
+/// Process tasks which can not be processed directly during USB interrupt
+vio_status_t vio_expreq_process()
+{
+	vio_status_t result = VIO_STATUS_OK;
+
+	if(process_send_varpwm_list == true)
+	{
+		char msg[24];
+		uint32_t startTime;
+		for(uint16_t i = 0; i < expReq.VarPwm.count; i++)
+		{
+			snprintf(msg, sizeof(msg), "%d%c%u%c%u%c", VIO_CMD_GET_EXPREQ_VARPWM_LIST, VIO_COMM_DELIMETER, i, VIO_COMM_DELIMETER, expReq.VarPwm.elements[i], VIO_COMM_TERMINATOR);
+
+			startTime = HAL_GetTick();
+			while(vio_send_data(msg, strlen(msg)) != VIO_STATUS_OK)
+			{
+				if((HAL_GetTick() - startTime) > VIO_SYS_TIMEOUT_MS)
+				{
+					result = VIO_STATUS_SYS_TIMEOUT;
+					goto error;
+				}
+
+			}
+		}
+		error:
+		process_send_varpwm_list = false;
+	}
+
+	return result;
 }
 
 vio_status_t vio_get_expreq_min_period_us(char *buf, uint8_t len)
@@ -198,6 +234,15 @@ vio_status_t vio_get_expreq_varpwm_waitforextsync(char *buf, uint8_t len)
 	return VIO_STATUS_OK;
 }
 
+vio_status_t vio_get_expreq_varpwm_list(char *buf, uint8_t len)
+{
+	if(expReq.VarPwm.count <= 0)
+		return VIO_STATUS_EXPREQ_VARPWM_SEQUENCE_EMPTY;
+
+	process_send_varpwm_list = true;
+	return VIO_STATUS_OK;
+}
+
 vio_status_t vio_get_expreq_varpwm_notify(char *buf, uint8_t len)
 {
 	snprintf(buf, len, "%d", expReq.VarPwm.notify);
@@ -209,7 +254,7 @@ vio_status_t vio_get_expreq_varpwm_notify(char *buf, uint8_t len)
 
 vio_status_t vio_set_expreq_one_pulse_length(const void *newValue)
 {
-	vio_status_t result = vio_expreq_is_period_in_range((uint32_t *)newValue);
+	vio_status_t result = vio_is_value_in_range((uint32_t *)newValue, &VIO_EXPREQ_MIN_PULSE_US, &VIO_EXPREQ_MAX_PULSE_US);
 	if (result == VIO_STATUS_OK)
 		expReq.OnePulse.lengthUs = *(uint32_t *)newValue;
 
@@ -245,7 +290,7 @@ vio_status_t vio_set_expreq_state(const void *newValue)
 
 vio_status_t vio_set_expreq_frequency(const void *newValue)
 {
-	vio_status_t result = vio_expreq_is_period_in_range((uint32_t *)newValue);
+	vio_status_t result = vio_is_value_in_range((uint32_t *)newValue, &VIO_EXPREQ_MIN_PERIOD_US, &VIO_EXPREQ_MAX_PERIOD_US);
 	if(result == VIO_STATUS_OK)
 	{
 		expReq.fPeriodUs = *(uint32_t *)newValue;
@@ -259,9 +304,9 @@ vio_status_t vio_set_expreq_frequency(const void *newValue)
 		__HAL_TIM_SET_PRESCALER(&htim1, prescaler);
 		__HAL_TIM_SET_AUTORELOAD(&htim1, period);
 
-//		char buf[64];   //the stuff below is used for debugging. Will remove later.
-//		snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, prescaler, period);
-//		CDC_Transmit_FS(buf, strlen(buf));
+		char buf[64];   //the stuff below is used for debugging. Will remove later.
+		snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, prescaler, period);
+		vio_send_data(buf, strlen(buf));
 	}
 
 	return result;
@@ -269,7 +314,7 @@ vio_status_t vio_set_expreq_frequency(const void *newValue)
 
 vio_status_t vio_set_expreq_fixpwm_pwidth(const void *newValue)
 {
-	vio_status_t result = vio_expreq_is_period_in_range((uint32_t *)newValue);
+	vio_status_t result = vio_is_value_in_range((uint32_t *)newValue, &VIO_EXPREQ_MIN_PULSE_US, &VIO_EXPREQ_MAX_PULSE_US);
 	if (result == VIO_STATUS_OK)
 	{
 		uint32_t cycles = (HAL_RCC_GetPCLK2Freq() / (1000000.0 / *(uint32_t *)newValue));
@@ -277,6 +322,10 @@ vio_status_t vio_set_expreq_fixpwm_pwidth(const void *newValue)
 
 		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, period);
 		expReq.FixedPwm.widthUs = *(uint32_t *)newValue;
+
+		char buf[64];   //the stuff below is used for debugging. Will remove later.
+		snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, __HAL_TIM_GET_PRESCALER(&htim1), period);
+		vio_send_data(buf, strlen(buf));
 	}
 
 	return result;
@@ -333,7 +382,7 @@ vio_status_t vio_set_expreq_varpwm_add(const void *newValue)
 		goto error;
 	}
 
-	result = vio_expreq_is_period_in_range((uint32_t *)newValue);
+	result = vio_is_value_in_range((uint32_t *)newValue, &VIO_EXPREQ_MIN_PULSE_US, &VIO_EXPREQ_MAX_PULSE_US);
 	if(result == VIO_STATUS_OK)
 		expReq.VarPwm.elements[expReq.VarPwm.count++] = *(uint16_t *)newValue;
 
@@ -352,17 +401,16 @@ vio_status_t vio_set_expreq_varpwm_notify(const void *newValue)
 	return result;
 }
 
-static vio_status_t vio_expreq_is_period_in_range(const uint32_t *fPeriodUs)
-{
-	if(((*fPeriodUs < VIO_EXPREQ_MIN_PERIOD_US) || (*fPeriodUs > VIO_EXPREQ_MAX_PERIOD_US)))
-		return VIO_STATUS_OUT_OF_RANGE;
-
-	return VIO_STATUS_OK;
-}
-
 void TIM1_CC_IRQHandler(void)
 {
   HAL_TIM_IRQHandler(&htim1);
+}
+
+void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
+{
+	char msg[16];
+	snprintf(msg, sizeof(msg), "PWM%c", VIO_COMM_TERMINATOR);
+	vio_send_data(msg, strlen(msg));
 }
 
 void vio_expreq_irq_callback()

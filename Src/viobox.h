@@ -10,7 +10,11 @@
 
 #include "stdint.h"
 
-enum{VIO_EXPREQ_MAX_SEQUENCE_LENGTH = 5000}; /// Maximum number of elements in the variable pwm queue
+enum
+{
+VIO_EXPREQ_MAX_SEQUENCE_LENGTH = 5000, /// Maximum number of elements in the variable pwm queue
+VIO_SYS_TIMEOUT_MS = 1000,			   /// Timeout in milliseconds
+};
 
 typedef enum
 {
@@ -21,8 +25,10 @@ typedef enum
 typedef enum
 {
 	VIO_STATUS_OK = 0,
+	VIO_STATUS_SYS_BUSY,
+	VIO_STATUS_SYS_ERROR,
+	VIO_STATUS_SYS_TIMEOUT,
 	VIO_STATUS_EXPOSEOK_EVENT,
-	VIO_STATUS_GENERIC_ERROR,
 	VIO_STATUS_EXPREQ_VARPWM_IS_RUNNING,
 	VIO_STATUS_EXPREQ_VARPWM_SEQUENCE_FULL,
 	VIO_STATUS_EXPREQ_VARPWM_SEQUENCE_EMPTY,
@@ -54,7 +60,7 @@ typedef enum
 	VIO_CMD_GET_EXPREQ_VARPWM_LOOPING,  		/// Returns the value of vio_expreq_varpwm_t.enableLooping
 	VIO_CMD_GET_EXPREQ_VARPWM_NUMLOOPS, 		/// Returns the value of vio_expreq_varpwm_t.numLoops
 	VIO_CMD_GET_EXPREQ_VARPWM_WAITFOREXTSYNC,   /// Returns the value of vio_expreq_varpwm_t.waitForExtSync
-	VIO_CMD_GET_EXPREQ_VARPWM_ELEMENT,          /// Takes a parameter of Element Number. Returns the value of that element if it exists.
+	VIO_CMD_GET_EXPREQ_VARPWM_LIST,             /// Returns each element in vio_expreq_varpwm.elements
 	VIO_CMD_GET_EXPREQ_VARPWM_NOTIFY,
 	VIO_CMD_GET_PREP_MIN_TIME_US,
 	VIO_CMD_GET_PREP_MAX_TIME_US,
@@ -151,6 +157,8 @@ typedef struct
 void vio_init();
 void vio_recv_data(const char *inBuf, uint16_t len);
 bool vio_is_valid_bool(const bool *value);
-void vio_send_data(const char *buf, uint8_t len);
+vio_status_t vio_send_data(const char *buf, uint8_t len);
+vio_status_t vio_is_value_in_range(const uint32_t *value, const uint32_t *minValue, const uint32_t *maxValue);
+void vio_process();
 
 #endif /* VIOBOX_H_ */

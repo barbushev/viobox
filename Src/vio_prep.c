@@ -24,8 +24,6 @@ static vio_prepare_t prep =
 		.notify = false,
 };
 
-static vio_status_t vio_prep_is_period_in_range(const uint32_t *fPeriodUs);
-
 vio_status_t vio_prep_init()
 {
 	//TIM2 is clocked from APB1. APB1 timer clock is configured to run at 72 MHz
@@ -43,7 +41,7 @@ vio_status_t vio_prep_init()
 		  _Error_Handler(__FILE__, __LINE__);
 	  }
 
-	  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	  sConfigOC.OCMode = TIM_OCMODE_ACTIVE;
 	  sConfigOC.Pulse = 0;   //no pulse width
 	  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 	  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
@@ -105,7 +103,7 @@ vio_status_t vio_set_prep_timeus(const void *newValue)
 	if(prep.isRunning == true)
 		result = VIO_STATUS_PREP_ALREADY_RUNNING;
 	else
-		result = vio_prep_is_period_in_range((uint32_t *)newValue);
+		result = vio_is_value_in_range((uint32_t *)newValue, &VIO_PREP_MIN_PERIOD_US, &VIO_PREP_MAX_PERIOD_US);
 
 	if(result == VIO_STATUS_OK)
 		prep.timeUs = *(uint32_t *)newValue;
@@ -144,14 +142,6 @@ vio_status_t vio_set_prep_notify(const void *newValue)
 		prep.notify = *(bool *)newValue;
 
 	return result;
-}
-
-static vio_status_t vio_prep_is_period_in_range(const uint32_t *fPeriodUs)
-{
-	if(((*fPeriodUs < VIO_PREP_MIN_PERIOD_US) || (*fPeriodUs > VIO_PREP_MAX_PERIOD_US)))
-		return VIO_STATUS_OUT_OF_RANGE;
-
-	return VIO_STATUS_OK;
 }
 
 void vio_prep_irq_callback()

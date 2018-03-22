@@ -12,6 +12,7 @@
 #include "stdint.h"
 
 vio_status_t vio_exp_req_init();
+vio_status_t vio_expreq_process();
 
 vio_status_t vio_get_expreq_max_sequence_length(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_min_period_us(char *buf, uint8_t len);
@@ -25,6 +26,7 @@ vio_status_t vio_get_expreq_varpwm_position(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_varpwm_looping(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_varpwm_numloops(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_varpwm_waitforextsync(char *buf, uint8_t len);
+vio_status_t vio_get_expreq_varpwm_list(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_varpwm_notify(char *buf, uint8_t len);
 
 vio_status_t vio_set_expreq_one_pulse_length(const void *);
