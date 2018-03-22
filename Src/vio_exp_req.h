@@ -17,6 +17,8 @@ vio_status_t vio_expreq_process();
 vio_status_t vio_get_expreq_max_sequence_length(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_min_period_us(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_max_period_us(char *buf, uint8_t len);
+vio_status_t vio_get_expreq_min_pulse_us(char *buf, uint8_t len);
+vio_status_t vio_get_expreq_max_pulse_us(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_state(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_frequency(char *buf, uint8_t len);
 vio_status_t vio_get_expreq_one_pulse_length(char *buf, uint8_t len);

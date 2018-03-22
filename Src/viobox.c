@@ -47,6 +47,8 @@ static vio_status_t(*vio_get[])(char *, uint8_t) =
 	[VIO_CMD_GET_SSR_STATE] = vio_get_ssr_state,
 	[VIO_CMD_GET_EXPREQ_MIN_PERIOD_US] = vio_get_expreq_min_period_us,
 	[VIO_CMD_GET_EXPREQ_MAX_PERIOD_US] = vio_get_expreq_max_period_us,
+	[VIO_CMD_GET_EXPREQ_MIN_PULSE_US] = vio_get_expreq_min_pulse_us,
+	[VIO_CMD_GET_EXPREQ_MAX_PULSE_US] = vio_get_expreq_max_pulse_us,
 	[VIO_CMD_GET_EXPREQ_MAX_SEQUENCE_LENGTH] = vio_get_expreq_max_sequence_length,
 	[VIO_CMD_GET_EXPREQ_STATE] = vio_get_expreq_state,
 	[VIO_CMD_GET_EXPREQ_FREQUENCY] = vio_get_expreq_frequency,
@@ -150,9 +152,12 @@ void vio_recv_data(const char *inBuf, uint16_t len)
 	vio_send_data(resp, strlen(resp));
 }
 
-bool vio_is_valid_bool(const bool *value)
+vio_status_t vio_is_valid_bool(const bool *value)
 {
-	return ((*value == true) || (*value == false));
+	if((*value == true) || (*value == false))
+		return VIO_STATUS_OK;
+	else
+		return VIO_STATUS_BAD_PARAMETER;
 }
 
 vio_status_t vio_is_value_in_range(const uint32_t *value, const uint32_t *minValue, const uint32_t *maxValue)
@@ -220,10 +225,8 @@ static vio_status_t vio_set_expok_count_zero()
 
 static vio_status_t vio_set_expok_notify(const void *newValue)
 {
-	vio_status_t result = VIO_STATUS_OK;
-	if(!vio_is_valid_bool((bool *)newValue))
-		result = VIO_STATUS_BAD_PARAMETER;
-	else
+	vio_status_t result = vio_is_valid_bool((bool *)newValue);
+	if(result == VIO_STATUS_OK)
 		expOk.notify = *(bool *)newValue;
 
 	return result;

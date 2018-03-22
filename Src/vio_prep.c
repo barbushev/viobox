@@ -113,32 +113,30 @@ vio_status_t vio_set_prep_timeus(const void *newValue)
 
 vio_status_t vio_set_prep_isrunning(const void *newValue)
 {
-	vio_status_t result = VIO_STATUS_OK;
-	if(!vio_is_valid_bool((bool *)newValue))
-		result = VIO_STATUS_BAD_PARAMETER;
-	else if(prep.timeUs <= 0)
-		result = VIO_STATUS_PREP_NOT_CONFIGURED;
-	else if((prep.isRunning == true) && *(bool *)newValue == true)
-		result = VIO_STATUS_PREP_ALREADY_RUNNING;
-	else
+	vio_status_t result = vio_is_valid_bool((bool *)newValue);
+	if(result == VIO_STATUS_OK)
 	{
-		if(*(bool *)newValue == true)
-			HAL_TIM_OnePulse_Start_IT(&htim2, TIM_CHANNEL_1);
+		if(prep.timeUs <= 0)
+			result = VIO_STATUS_PREP_NOT_CONFIGURED;
+		else if((prep.isRunning == true) && *(bool *)newValue == true)
+			result = VIO_STATUS_PREP_ALREADY_RUNNING;
 		else
-			HAL_TIM_OnePulse_Stop_IT(&htim2, TIM_CHANNEL_1);
+		{
+			if(*(bool *)newValue == true)
+				HAL_TIM_OnePulse_Start_IT(&htim2, TIM_CHANNEL_1);
+			else
+				HAL_TIM_OnePulse_Stop_IT(&htim2, TIM_CHANNEL_1);
 
-		prep.isRunning = *(bool *)newValue;
+			prep.isRunning = *(bool *)newValue;
+		}
 	}
-
 	return result;
 }
 
 vio_status_t vio_set_prep_notify(const void *newValue)
 {
-	vio_status_t result = VIO_STATUS_OK;
-	if(!vio_is_valid_bool((bool *)newValue))
-		result = VIO_STATUS_BAD_PARAMETER;
-	else
+	vio_status_t result = vio_is_valid_bool((bool *)newValue);
+	if(result == VIO_STATUS_OK)
 		prep.notify = *(bool *)newValue;
 
 	return result;

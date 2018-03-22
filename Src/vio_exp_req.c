@@ -174,6 +174,18 @@ vio_status_t vio_get_expreq_max_period_us(char *buf, uint8_t len)
 	return VIO_STATUS_OK;
 }
 
+vio_status_t vio_get_expreq_min_pulse_us(char *buf, uint8_t len)
+{
+	snprintf(buf, len, "%lu", VIO_EXPREQ_MIN_PULSE_US);
+	return VIO_STATUS_OK;
+}
+
+vio_status_t vio_get_expreq_max_pulse_us(char *buf, uint8_t len)
+{
+	snprintf(buf, len, "%lu", VIO_EXPREQ_MAX_PULSE_US);
+	return VIO_STATUS_OK;
+}
+
 vio_status_t vio_get_expreq_max_sequence_length(char *buf, uint8_t len)
 {
 	snprintf(buf, len, "%d", VIO_EXPREQ_MAX_SEQUENCE_LENGTH);
@@ -268,18 +280,49 @@ vio_status_t vio_set_expreq_state(const void *newValue)
 	switch(*(vio_expreq_state_t *)newValue)
 	{
 		case VIO_EXPREQ_IDLE:
+		{
 			HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+			expReq.State = VIO_EXPREQ_IDLE;
 			break;
+		}
 
 		case VIO_EXPREQ_ONE_PULSE:
+		{
+			if(expReq.State == VIO_EXPREQ_ONE_PULSE)
+				result = VIO_STATUS_EXPREQ_ONEPULSE_IS_RUNNING;
+			else
+			{
+				HAL_TIM_OnePulse_Start_IT(&htim1, TIM_CHANNEL_1);
+				expReq.State = VIO_EXPREQ_ONE_PULSE;
+			}
 			break;
+		}
 
 		case VIO_EXPREQ_FIXED_PWM:
-			HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+		{
+			if(expReq.State == VIO_EXPREQ_FIXED_PWM)
+				result = VIO_STATUS_EXPREQ_FIXPWM_IS_RUNNING;
+			else
+			{
+				HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+				expReq.State = VIO_EXPREQ_FIXED_PWM;
+			}
 			break;
+		}
 
 		case VIO_EXPREQ_VARIABLE_PWM:
+		{
+			if(expReq.VarPwm.count <= 0)
+				result = VIO_STATUS_EXPREQ_VARPWM_SEQUENCE_EMPTY;
+			else if(expReq.State == VIO_EXPREQ_VARIABLE_PWM)
+				result = VIO_STATUS_EXPREQ_VARPWM_IS_RUNNING;
+			else
+			{
+				HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
+				expReq.State = VIO_EXPREQ_VARIABLE_PWM;
+			}
 			break;
+		}
 
 		default:
 			result = VIO_STATUS_BAD_PARAMETER;
@@ -333,10 +376,8 @@ vio_status_t vio_set_expreq_fixpwm_pwidth(const void *newValue)
 
 vio_status_t vio_set_expreq_varpwm_looping(const void *newValue)
 {
-	vio_status_t result = VIO_STATUS_OK;
-	if(!vio_is_valid_bool((bool *)newValue))
-		result = VIO_STATUS_BAD_PARAMETER;
-	else
+	vio_status_t result = vio_is_valid_bool((bool *)newValue);
+	if(result == VIO_STATUS_OK)
 		expReq.VarPwm.enableLooping = *(bool *)newValue;
 
 	return result;
@@ -344,10 +385,8 @@ vio_status_t vio_set_expreq_varpwm_looping(const void *newValue)
 
 vio_status_t vio_set_expreq_varpwm_waitforextsync(const void *newValue)
 {
-	vio_status_t result = VIO_STATUS_OK;
-	if(!vio_is_valid_bool((bool *)newValue))
-		result = VIO_STATUS_BAD_PARAMETER;
-	else
+	vio_status_t result = vio_is_valid_bool((bool *)newValue);
+	if(result == VIO_STATUS_OK)
 		expReq.VarPwm.waitForExtSync = *(bool *)newValue;
 
 	return result;
@@ -392,10 +431,8 @@ vio_status_t vio_set_expreq_varpwm_add(const void *newValue)
 
 vio_status_t vio_set_expreq_varpwm_notify(const void *newValue)
 {
-	vio_status_t result = VIO_STATUS_OK;
-	if(!vio_is_valid_bool((bool *)newValue))
-		result = VIO_STATUS_BAD_PARAMETER;
-	else
+	vio_status_t result = vio_is_valid_bool((bool *)newValue);
+	if(result == VIO_STATUS_OK)
 		expReq.VarPwm.notify = *(bool *)newValue;
 
 	return result;

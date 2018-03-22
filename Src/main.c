@@ -49,6 +49,7 @@
 #include "main.h"
 #include "stm32f1xx_hal.h"
 #include "usb_device.h"
+#include "viobox.h"
 
 extern void vio_init();
 /* USER CODE BEGIN Includes */
