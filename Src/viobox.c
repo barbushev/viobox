@@ -11,7 +11,7 @@
 
 #include "usbd_cdc_if.h"
 #include "usbd_desc.h"
-
+#include "stdarg.h"
 
 /*
 MAJOR.MINOR.PATCH, increment the:
@@ -54,13 +54,14 @@ static vio_status_t(*vio_get[])(char *, uint8_t) =
 	[VIO_CMD_GET_EXPREQ_FREQUENCY] = vio_get_expreq_frequency,
 	[VIO_CMD_GET_EXPREQ_ONE_PULSE_LENGTH] = vio_get_expreq_one_pulse_length,
 	[VIO_CMD_GET_EXPREQ_FIXPWM_PWIDTH] = vio_get_expreq_fixpwm_pwidth,
+	[VIO_CMD_GET_EXPREQ_FIXPWM_REPEAT] = vio_get_expreq_fixpwm_repeat,
 	[VIO_CMD_GET_EXPREQ_VARPWM_COUNT] = vio_get_expreq_varpwm_count,
 	[VIO_CMD_GET_EXPREQ_VARPWM_POSITION] = vio_get_expreq_varpwm_position,
 	[VIO_CMD_GET_EXPREQ_VARPWM_LOOPING] = vio_get_expreq_varpwm_looping,
 	[VIO_CMD_GET_EXPREQ_VARPWM_NUMLOOPS] = vio_get_expreq_varpwm_numloops,
 	[VIO_CMD_GET_EXPREQ_VARPWM_WAITFOREXTSYNC] = vio_get_expreq_varpwm_waitforextsync,
 	[VIO_CMD_GET_EXPREQ_VARPWM_LIST] = vio_get_expreq_varpwm_list,
-	[VIO_CMD_GET_EXPREQ_VARPWM_NOTIFY] = vio_get_expreq_varpwm_notify,
+	[VIO_CMD_GET_EXPREQ_NOTIFY] = vio_get_expreq_notify,
 	[VIO_CMD_GET_PREP_MIN_TIME_US] = vio_get_prep_min_time_us,
 	[VIO_CMD_GET_PREP_MAX_TIME_US] = vio_get_prep_max_time_us,
 	[VIO_CMD_GET_PREP_TIME_US] = vio_get_prep_timeus,
@@ -78,11 +79,12 @@ static vio_status_t(*vio_set[])(const void *) =
 	[VIO_CMD_SET_EXPREQ_STATE] = vio_set_expreq_state,							/// Set the state of Expose Request. Requires a vio_expreq_state_t parameter.
 	[VIO_CMD_SET_EXPREQ_FREQUENCY] = vio_set_expreq_frequency,
 	[VIO_CMD_SET_EXPREQ_FIXPWM_PWIDTH] = vio_set_expreq_fixpwm_pwidth,
+	[VIO_CMD_SET_EXPREQ_FIXPWM_REPEAT] = vio_set_expreq_fixpwm_repeat,
 	[VIO_CMD_SET_EXPREQ_VARPWM_LOOPING] = vio_set_expreq_varpwm_looping,  		/// Takes a parameter of bool (0 or 1). Enables or disables looping.
 	[VIO_CMD_SET_EXPREQ_VARPWM_WAITFOREXTSYNC] = vio_set_expreq_varpwm_waitforextsync,
 	[VIO_CMD_SET_EXPREQ_VARPWM_EMPTY] = vio_set_expreq_varpwm_empty,            /// Clear all vio_expreq_varpwm_t.elements
 	[VIO_CMD_SET_EXPREQ_VARPWM_ADD] = vio_set_expreq_varpwm_add,			    /// Takes a parameter pulseWidthUs. Adds it to the end of the queue.
-	[VIO_CMD_SET_EXPREQ_VARPWM_NOTIFY] = vio_set_expreq_varpwm_notify,
+	[VIO_CMD_SET_EXPREQ_NOTIFY] = vio_set_expreq_notify,
 	[VIO_CMD_SET_PREP_TIMEUS] = vio_set_prep_timeus,
 	[VIO_CMD_SET_PREP_ISRUNNING] = vio_set_prep_isrunning,
 	[VIO_CMD_SET_PREP_NOTIFY] = vio_set_prep_notify,
@@ -266,6 +268,19 @@ vio_status_t vio_send_data(const char *buf, uint8_t len)
 	}
 }
 
+vio_status_t vio_send_data_vararg(const char *string, ...)
+{
+	uint8_t bufSize = 64;
+	char buf[bufSize];
+
+	va_list args;
+	va_start(args, string);
+	uint8_t length = vsnprintf(buf, bufSize, string, args);
+	va_end(args);
+
+	return vio_send_data(buf, length);
+}
+
 
 /// @brief EXTI line detection callbacks
 /// @param GPIO_Pin: Specifies the pins connected EXTI line
@@ -282,18 +297,3 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	  }
   }
 }
-
-/*
-static void USB_SEND(const char *string, ...)
-{
-	uint8_t bufSize = 64;
-	char buf[bufSize];
-
-	va_list args;
-	va_start(args, string);
-	uint8_t length = vsnprintf(buf, bufSize, string, args);
-	va_end(args);
-
-	CDC_Transmit_FS(buf, length);
-}
-*/

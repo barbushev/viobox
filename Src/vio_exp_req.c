@@ -17,6 +17,7 @@ static const uint32_t VIO_EXPREQ_MIN_PERIOD_US = 1000;			/// Minimum period leng
 static const uint32_t VIO_EXPREQ_MAX_PERIOD_US = 10000000;		/// Maximum period length in microseconds. 0.1 Hz
 static const uint32_t VIO_EXPREQ_MIN_PULSE_US = 1;				/// Minimum pulse width in microseconds.
 static const uint32_t VIO_EXPREQ_MAX_PULSE_US = 10000001;		/// Maximum pulse width in microseconds. 0.1 Hz
+static const uint32_t TIMER_RESOLUTION = 65536;                 /// The resulution of the PWM timer. We are using Timer1 and on STM32F103, it is 16bit.
 
 extern const char VIO_COMM_DELIMETER;
 extern const char VIO_COMM_TERMINATOR;
@@ -24,6 +25,8 @@ extern const char VIO_COMM_TERMINATOR;
 
 static TIM_HandleTypeDef htim1;
 static bool process_send_varpwm_list = false;
+static void vio_expreq_calc_timer_period(const uint32_t *pulseUs, uint32_t *returnPeriod);
+
 
 static vio_expose_request_t expReq =
 {
@@ -31,13 +34,14 @@ static vio_expose_request_t expReq =
 	.fPeriodUs = 0,
 	.OnePulse.lengthUs = 0,
 	.FixedPwm.widthUs = 0,
-	.FixedPwm.count = 0,
+	.FixedPwm.repeat = 0,
+	.FixedPwm.private_counter = 0,
 	.VarPwm.count = 0,
 	.VarPwm.position = 0,
 	.VarPwm.enableLooping = false,
 	.VarPwm.numLoops = 0,
 	.VarPwm.waitForExtSync = false,
-	.VarPwm.notify = false,
+	.notify = false,
 };
 
 vio_status_t vio_exp_req_init()
@@ -139,23 +143,22 @@ vio_status_t vio_expreq_process()
 
 	if(process_send_varpwm_list == true)
 	{
-		char msg[24];
 		uint32_t startTime;
 		for(uint16_t i = 0; i < expReq.VarPwm.count; i++)
 		{
-			snprintf(msg, sizeof(msg), "%d%c%u%c%u%c", VIO_CMD_GET_EXPREQ_VARPWM_LIST, VIO_COMM_DELIMETER, i, VIO_COMM_DELIMETER, expReq.VarPwm.elements[i], VIO_COMM_TERMINATOR);
-
 			startTime = HAL_GetTick();
-			while(vio_send_data(msg, strlen(msg)) != VIO_STATUS_OK)
+			do
 			{
+				result = vio_send_data_vararg("%d%c%u%c%lu%c", VIO_CMD_GET_EXPREQ_VARPWM_LIST, VIO_COMM_DELIMETER, i, VIO_COMM_DELIMETER, expReq.VarPwm.elements[i], VIO_COMM_TERMINATOR);
 				if((HAL_GetTick() - startTime) > VIO_SYS_TIMEOUT_MS)
 				{
 					result = VIO_STATUS_SYS_TIMEOUT;
 					goto error;
 				}
-
 			}
+			while(result != VIO_STATUS_OK);
 		}
+
 		error:
 		process_send_varpwm_list = false;
 	}
@@ -217,6 +220,12 @@ vio_status_t vio_get_expreq_fixpwm_pwidth(char *buf, uint8_t len)
 	return VIO_STATUS_OK;
 }
 
+vio_status_t vio_get_expreq_fixpwm_repeat(char *buf, uint8_t len)
+{
+	snprintf(buf, len, "%lu", expReq.FixedPwm.repeat);
+	return VIO_STATUS_OK;
+}
+
 vio_status_t vio_get_expreq_varpwm_count(char *buf, uint8_t len)
 {
 	snprintf(buf, len, "%d", expReq.VarPwm.count);
@@ -256,9 +265,9 @@ vio_status_t vio_get_expreq_varpwm_list(char *buf, uint8_t len)
 	return VIO_STATUS_OK;
 }
 
-vio_status_t vio_get_expreq_varpwm_notify(char *buf, uint8_t len)
+vio_status_t vio_get_expreq_notify(char *buf, uint8_t len)
 {
-	snprintf(buf, len, "%d", expReq.VarPwm.notify);
+	snprintf(buf, len, "%d", expReq.notify);
 	return VIO_STATUS_OK;
 }
 
@@ -276,7 +285,13 @@ vio_status_t vio_set_expreq_one_pulse_length(const void *newValue)
 
 vio_status_t vio_set_expreq_state(const void *newValue)
 {
-	vio_status_t result = VIO_STATUS_OK;
+	vio_status_t result = VIO_STATUS_OK;  //VIO_STATUS_EXPREQ_CHANGE_STATE_FAIL
+	//Only allow to switch state from idle to another state or from another state to idle
+	if((expReq.State != VIO_EXPREQ_IDLE) && (*(vio_expreq_state_t *)newValue != VIO_EXPREQ_IDLE))
+	{
+		result = VIO_STATUS_EXPREQ_STATE_NOT_ALLOWED;
+		goto error;
+	}
 
 	switch(*(vio_expreq_state_t *)newValue)
 	{
@@ -289,25 +304,25 @@ vio_status_t vio_set_expreq_state(const void *newValue)
 
 		case VIO_EXPREQ_ONE_PULSE:
 		{
-			if(expReq.State == VIO_EXPREQ_ONE_PULSE)
-				result = VIO_STATUS_EXPREQ_ONEPULSE_IS_RUNNING;
-			else
-			{
-				HAL_TIM_OnePulse_Start_IT(&htim1, TIM_CHANNEL_1);
-				expReq.State = VIO_EXPREQ_ONE_PULSE;
-			}
+			HAL_TIM_OnePulse_Start_IT(&htim1, TIM_CHANNEL_1);
+			expReq.State = VIO_EXPREQ_ONE_PULSE;
+
 			break;
 		}
 
 		case VIO_EXPREQ_FIXED_PWM:
 		{
-			if(expReq.State == VIO_EXPREQ_FIXED_PWM)
-				result = VIO_STATUS_EXPREQ_FIXPWM_IS_RUNNING;
-			else
-			{
-				HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-				expReq.State = VIO_EXPREQ_FIXED_PWM;
-			}
+			result = vio_set_expreq_frequency(&(expReq.fPeriodUs)); //Just in case set the frequency. Should already be correct.
+			if(result != VIO_STATUS_OK)
+				break;
+			expReq.FixedPwm.private_counter = 0;  //clear the counter
+			uint32_t pulseWidth = 0;  //load the correct pulse width
+			vio_expreq_calc_timer_period(&expReq.FixedPwm.widthUs, &pulseWidth);
+			__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulseWidth);
+
+			HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
+			expReq.State = VIO_EXPREQ_FIXED_PWM;
+
 			break;
 		}
 
@@ -315,10 +330,25 @@ vio_status_t vio_set_expreq_state(const void *newValue)
 		{
 			if(expReq.VarPwm.count <= 0)
 				result = VIO_STATUS_EXPREQ_VARPWM_SEQUENCE_EMPTY;
-			else if(expReq.State == VIO_EXPREQ_VARIABLE_PWM)
-				result = VIO_STATUS_EXPREQ_VARPWM_IS_RUNNING;
 			else
 			{
+				result = vio_set_expreq_frequency(&(expReq.fPeriodUs)); //Just in case set the frequency. Should already be correct.
+				if(result != VIO_STATUS_OK)
+					break;
+
+				//@ TODO before starting, check that all the queued up pulse widths fit the currently selected frequency and take some action?
+				for(uint16_t pNum = 0; pNum < expReq.VarPwm.count; pNum++)
+				{
+					if(expReq.VarPwm.elements[pNum] > (expReq.fPeriodUs + 1)) __NOP();
+				}
+
+				expReq.VarPwm.position = 0;
+				expReq.VarPwm.numLoops = 0;
+
+				uint32_t pulseWidth = 0;  //load the first pulse width
+				vio_expreq_calc_timer_period(&expReq.VarPwm.elements[expReq.VarPwm.position], &pulseWidth);
+				__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulseWidth);
+
 				HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
 				expReq.State = VIO_EXPREQ_VARIABLE_PWM;
 			}
@@ -329,6 +359,7 @@ vio_status_t vio_set_expreq_state(const void *newValue)
 			result = VIO_STATUS_BAD_PARAMETER;
 	}
 
+	error:
 	return result;
 }
 
@@ -338,7 +369,6 @@ vio_status_t vio_set_expreq_frequency(const void *newValue)
 	if(result == VIO_STATUS_OK)
 	{
 		expReq.fPeriodUs = *(uint32_t *)newValue;
-		static const uint32_t TIMER_RESOLUTION = 65536;
 
 		uint32_t cycles = (HAL_RCC_GetPCLK2Freq() / (1000000.0 / *(uint32_t *)newValue));  //1000000 / microseconds - converting back to Hz
 		uint32_t prescaler = (cycles / TIMER_RESOLUTION) - 1;
@@ -348,9 +378,9 @@ vio_status_t vio_set_expreq_frequency(const void *newValue)
 		__HAL_TIM_SET_PRESCALER(&htim1, prescaler);
 		__HAL_TIM_SET_AUTORELOAD(&htim1, period);
 
-		char buf[64];   //the stuff below is used for debugging. Will remove later.
-		snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, prescaler, period);
-		vio_send_data(buf, strlen(buf));
+		//char buf[64];   //the stuff below is used for debugging. Will remove later.
+		//snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, prescaler, period);
+		//vio_send_data(buf, strlen(buf));
 	}
 
 	return result;
@@ -361,17 +391,39 @@ vio_status_t vio_set_expreq_fixpwm_pwidth(const void *newValue)
 	vio_status_t result = vio_is_value_in_range((uint32_t *)newValue, &VIO_EXPREQ_MIN_PULSE_US, &VIO_EXPREQ_MAX_PULSE_US);
 	if (result == VIO_STATUS_OK)
 	{
-		uint32_t cycles = (HAL_RCC_GetPCLK2Freq() / (1000000.0 / *(uint32_t *)newValue));
-		uint32_t period = (float)cycles / (float)(__HAL_TIM_GET_PRESCALER(&htim1) + 1);
-
-		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, period);
 		expReq.FixedPwm.widthUs = *(uint32_t *)newValue;
+		uint32_t newPeriod = 0;
+		vio_expreq_calc_timer_period((uint32_t *)newValue, &newPeriod);
 
-		char buf[64];   //the stuff below is used for debugging. Will remove later.
-		snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, __HAL_TIM_GET_PRESCALER(&htim1), period);
-		vio_send_data(buf, strlen(buf));
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, newPeriod);
 	}
 
+	return result;
+}
+
+
+//Calculates the capture/compare register value to achieve a certain pulse width using the current prescaler setting of the timer.
+static void vio_expreq_calc_timer_period(const uint32_t *pulseUs, uint32_t *returnPeriod)
+{
+	uint32_t cycles = (HAL_RCC_GetPCLK2Freq() / (1000000.0 / *pulseUs));  //1000000.0 / *pulseUs converts microseconds to Hz
+	*returnPeriod = (float)cycles / (float)(__HAL_TIM_GET_PRESCALER(&htim1) + 1);
+
+	//clamp the period to the max timer resolution. This will only be needed if a bad combination of frequency and pulse widths have been chosen. Example when the pulse width is wider the the frequency period.
+	if(*returnPeriod > (TIMER_RESOLUTION - 1))
+			*returnPeriod = TIMER_RESOLUTION - 1;
+
+	//char buf[64];   //the stuff below is used for debugging. Will remove later.
+	//snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, __HAL_TIM_GET_PRESCALER(&htim1), period);
+	//vio_send_data(buf, strlen(buf));
+}
+
+vio_status_t vio_set_expreq_fixpwm_repeat(const void *newValue)
+{
+	vio_status_t result = VIO_STATUS_OK;
+	if(expReq.State == VIO_EXPREQ_FIXED_PWM)
+		result = VIO_STATUS_EXPREQ_FIXPWM_IS_RUNNING;
+	else
+		expReq.FixedPwm.repeat = *(uint32_t *)newValue;
 	return result;
 }
 
@@ -424,17 +476,17 @@ vio_status_t vio_set_expreq_varpwm_add(const void *newValue)
 
 	result = vio_is_value_in_range((uint32_t *)newValue, &VIO_EXPREQ_MIN_PULSE_US, &VIO_EXPREQ_MAX_PULSE_US);
 	if(result == VIO_STATUS_OK)
-		expReq.VarPwm.elements[expReq.VarPwm.count++] = *(uint16_t *)newValue;
+		expReq.VarPwm.elements[expReq.VarPwm.count++] = *(uint32_t *)newValue;
 
 	error:
 	return result;
 }
 
-vio_status_t vio_set_expreq_varpwm_notify(const void *newValue)
+vio_status_t vio_set_expreq_notify(const void *newValue)
 {
 	vio_status_t result = vio_is_valid_bool((bool *)newValue);
 	if(result == VIO_STATUS_OK)
-		expReq.VarPwm.notify = *(bool *)newValue;
+		expReq.notify = *(bool *)newValue;
 
 	return result;
 }
@@ -446,28 +498,65 @@ void TIM1_CC_IRQHandler(void)
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
-	char msg[16];
-	snprintf(msg, sizeof(msg), "PWM%c", VIO_COMM_TERMINATOR);
-	vio_send_data(msg, strlen(msg));
+	switch(expReq.State)
+	{
+	case VIO_EXPREQ_ONE_PULSE:
+		vio_send_data_vararg("One Pulse%c", VIO_COMM_TERMINATOR);
+		break;
+	case VIO_EXPREQ_FIXED_PWM:
+		{
+			expReq.FixedPwm.private_counter++;
+			//if repeat is 0, it runs continuous otherwise it stops as soon as private_counter reaches repeat's value
+			if((expReq.FixedPwm.repeat != 0) && (expReq.FixedPwm.private_counter >= expReq.FixedPwm.repeat))
+			{
+				HAL_TIM_PWM_Stop_IT(&htim1, TIM_CHANNEL_1);
+				expReq.State = VIO_EXPREQ_IDLE;
+				if(expReq.notify == true)
+					vio_send_data_vararg("%d%c%lu%c", VIO_STATUS_EXPREQ_COMPLETED, VIO_COMM_DELIMETER, expReq.FixedPwm.private_counter, VIO_COMM_TERMINATOR);
+			}
+			break;
+		}
+
+	case VIO_EXPREQ_VARIABLE_PWM:
+		{
+			expReq.VarPwm.position++;
+			if(expReq.VarPwm.position >= expReq.VarPwm.count)
+			{
+				expReq.VarPwm.numLoops++;
+				if(expReq.VarPwm.enableLooping == true)
+				{
+					expReq.VarPwm.position = 0;
+					if(expReq.notify == true)
+						vio_send_data_vararg("%d%c%lu%c", VIO_STATUS_EXPREQ_LOOP_NUM, VIO_COMM_DELIMETER, expReq.VarPwm.numLoops, VIO_COMM_TERMINATOR);
+				}
+				else
+				{
+					HAL_TIM_PWM_Stop_IT(&htim1, TIM_CHANNEL_1);
+					expReq.State = VIO_EXPREQ_IDLE;
+					if(expReq.notify == true)
+						vio_send_data_vararg("%d%c", VIO_STATUS_EXPREQ_COMPLETED, VIO_COMM_TERMINATOR);
+					break;
+				}
+			}
+
+			uint32_t nextPeriod = 0;
+			vio_expreq_calc_timer_period(&expReq.VarPwm.elements[expReq.VarPwm.position], &nextPeriod);
+			__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, nextPeriod);
+			break;
+		}
+
+	case VIO_EXPREQ_IDLE:	//if state was idle or not any of the other defined states, there is a problem.
+	default:
+		{
+			HAL_TIM_PWM_Stop_IT(&htim1, TIM_CHANNEL_1);
+			vio_send_data_vararg("%d%c", VIO_STATUS_SYS_ERROR, VIO_COMM_TERMINATOR);
+
+			break;
+		}
+	}
 }
 
 void vio_expreq_irq_callback()
 {
-	///on completion of each loop
-	if((expReq.VarPwm.notify == true) && (expReq.State == VIO_EXPREQ_VARIABLE_PWM))
-	{
-		char msg[16];
-		if(expReq.VarPwm.enableLooping == false)
-			snprintf(msg, sizeof(msg), "%d%c", VIO_STATUS_EXPREQ_COMPLETED, VIO_COMM_TERMINATOR);
-		else
-			snprintf(msg, sizeof(msg), "%d%c%lu%c", VIO_STATUS_EXPREQ_LOOP_NUM, VIO_COMM_DELIMETER, expReq.VarPwm.numLoops, VIO_COMM_TERMINATOR);
 
-		vio_send_data(msg, strlen(msg));
-	}
-
-	if((expReq.State == VIO_EXPREQ_ONE_PULSE) || (expReq.State == VIO_EXPREQ_FIXED_PWM))
-		expReq.State = VIO_EXPREQ_IDLE;
-
-	if((expReq.State == VIO_EXPREQ_VARIABLE_PWM) && (expReq.VarPwm.enableLooping == false))
-		expReq.State = VIO_EXPREQ_IDLE;
 }

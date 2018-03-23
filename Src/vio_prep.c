@@ -149,15 +149,11 @@ void vio_prep_irq_callback()
 
 void TIM2_IRQHandler(void)
 {
-  HAL_TIM_IRQHandler(&htim2);
-  prep.isRunning = false;
+	HAL_TIM_IRQHandler(&htim2);
+	prep.isRunning = false;
 
-  if(prep.notify == true)
-  {
-  	char msg[16];
-  	snprintf(msg, sizeof(msg), "%d%c", VIO_STATUS_PREP_COMPLETED, VIO_COMM_TERMINATOR);
-  	vio_send_data(msg, strlen(msg));
-  }
+	if(prep.notify == true)
+		vio_send_data_vararg("%d%c", VIO_STATUS_PREP_COMPLETED, VIO_COMM_TERMINATOR);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
