@@ -31,6 +31,7 @@ static vio_expose_request_t expReq =
 	.fPeriodUs = 0,
 	.OnePulse.lengthUs = 0,
 	.FixedPwm.widthUs = 0,
+	.FixedPwm.count = 0,
 	.VarPwm.count = 0,
 	.VarPwm.position = 0,
 	.VarPwm.enableLooping = false,

@@ -59,22 +59,21 @@ void NMI_Handler(void)
   /* USER CODE END NonMaskableInt_IRQn 1 */
 }
 
+
+/**
+ * Executes the BKPT instruction that causes the debugger to stop.
+ * If no debugger is attached, this will be ignored
+ */
+#define bkpt() __asm volatile("BKPT #0\n")
+
 /**
 * @brief This function handles Hard fault interrupt.
 */
 void HardFault_Handler(void)
 {
-  /* USER CODE BEGIN HardFault_IRQn 0 */
-
-  /* USER CODE END HardFault_IRQn 0 */
-  while (1)
-  {
-    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
-    /* USER CODE END W1_HardFault_IRQn 0 */
-  }
-  /* USER CODE BEGIN HardFault_IRQn 1 */
-
-  /* USER CODE END HardFault_IRQn 1 */
+	    //Cause debugger to stop. Ignored if no debugger is attached
+	    bkpt();
+	    NVIC_SystemReset(); // If no debugger connected, just reset the board}
 }
 
 /**

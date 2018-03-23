@@ -106,6 +106,7 @@ static vio_exposeok_t expOk =
 //called once during boot to initialize hardware
 void vio_init()
 {
+	__HAL_AFIO_REMAP_SWJ_NOJTAG();
 	vio_exp_req_init();
 	vio_prep_init();
 }
@@ -242,7 +243,8 @@ static vio_status_t vio_sys_reboot()
 	char msg[16]; //have to send a response here as this will not return to vio_rcv_data
     snprintf(msg, sizeof(msg), "%d%c%d%c", VIO_CMD_SYS_REBOOT, VIO_COMM_DELIMETER, VIO_STATUS_OK, VIO_COMM_TERMINATOR);
     vio_send_data(msg, strlen(msg));
-    HAL_Delay(100);
+
+    for(uint32_t i = 0; i < 1000000; i++) __NOP();	//delay for a little bit, so the confirmation message will be sent
 
     NVIC_SystemReset();
 	return VIO_STATUS_OK;

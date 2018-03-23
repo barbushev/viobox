@@ -69,7 +69,7 @@ IWDG_HandleTypeDef hiwdg;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_IWDG_Init(void);
-
+void usb_force_reenumeration();
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -134,10 +134,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USB_DEVICE_Init();
   //MX_IWDG_Init();
-
-
+  usb_force_reenumeration();
+  HAL_Delay(1000);
+  MX_USB_DEVICE_Init();
   vio_init();
 
   /* USER CODE BEGIN 2 */
@@ -157,6 +157,21 @@ int main(void)
   /* USER CODE END 3 */
 
 }
+
+// On "generic" boards, the USB reset (to force re-enumeration by the host), is triggered by reconfiguring USB line D+ (PA12) into GPIO mode, and driving PA12 low for a short period, before setting the pin back to its USB operational mode. This system to reset the USB was written by @Victor_pv. Note. It is not guaranteed to work on all "generic" STM32 boards, and relies on PA12 having a pull-up resistor of around 1.5k - however most "generic" boards seem to have this. Its unclear if this method to reset the USB bus conforms precisely to the USB standard, but it seems to work fine on all PC's and Mac's (and Linux boxes) on which its been tested
+void usb_force_reenumeration()
+{
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+	 GPIO_InitTypeDef GPIO_InitStruct;
+
+	  /*Configure GPIO pin : PIN_POWER_CONTROL_OUT_Pin */
+	  GPIO_InitStruct.Pin = GPIO_PIN_12;
+	  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+	  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
+}
+
 
 /**
   * @brief System Clock Configuration

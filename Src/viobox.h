@@ -123,6 +123,7 @@ typedef struct
 typedef struct
 {
 	uint32_t widthUs;		    /// Pulse width of fixed PWM in microseconds.
+	uint32_t count;				/// The number of pulses to generate and then stop. Default is 0 and causes Fixed PWM to run continuously until stopped.
 }vio_expreq_fixedpwm_t;
 
 typedef struct
