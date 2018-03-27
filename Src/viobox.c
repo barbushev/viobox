@@ -242,9 +242,8 @@ static vio_status_t vio_set_serial_number(const void *newValue)
 
 static vio_status_t vio_sys_reboot()
 {
-	char msg[16]; //have to send a response here as this will not return to vio_rcv_data
-    snprintf(msg, sizeof(msg), "%d%c%d%c", VIO_CMD_SYS_REBOOT, VIO_COMM_DELIMETER, VIO_STATUS_OK, VIO_COMM_TERMINATOR);
-    vio_send_data(msg, strlen(msg));
+	//have to send a response here as this will not return to vio_rcv_data
+    vio_send_data_vararg("%d%c%d%c", VIO_CMD_SYS_REBOOT, VIO_COMM_DELIMETER, VIO_STATUS_OK, VIO_COMM_TERMINATOR);
 
     for(uint32_t i = 0; i < 1000000; i++) __NOP();	//delay for a little bit, so the confirmation message will be sent
 

@@ -134,9 +134,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  //MX_IWDG_Init();
   usb_force_reenumeration();
   HAL_Delay(1000);
+
+  MX_IWDG_Init();
   MX_USB_DEVICE_Init();
   vio_init();
 
@@ -149,9 +150,9 @@ int main(void)
   while (1)
   {
 
-  /* USER CODE END WHILE */
   vio_process();
-  /* USER CODE BEGIN 3 */
+
+  HAL_IWDG_Refresh(&hiwdg);
 
   }
   /* USER CODE END 3 */
@@ -234,10 +235,10 @@ void SystemClock_Config(void)
 /* IWDG init function */
 static void MX_IWDG_Init(void)
 {
-
+	//the watch dog runs off of a 32Khz Clock. With a Prescaler of 32 and a value of 4000 - it expires in 250ms
   hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_4;
-  hiwdg.Init.Reload = 4095;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_32;   //32 000 / 32 = 1000 / 4000 = 0.25s = 250ms
+  hiwdg.Init.Reload = 4000;   //the counter is a 12bit value (4095 max)
   if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);

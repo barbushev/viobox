@@ -63,76 +63,76 @@ vio_status_t vio_exp_req_init()
 	// Calculate period
 	// period = cycles / prescaler = 7 200 000 / 110 = 65454.54
 
-  TIM_ClockConfigTypeDef sClockSourceConfig;
-  TIM_MasterConfigTypeDef sMasterConfig;
-  TIM_OC_InitTypeDef sConfigOC;
-  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig;
+	TIM_ClockConfigTypeDef sClockSourceConfig;
+	TIM_MasterConfigTypeDef sMasterConfig;
+	TIM_OC_InitTypeDef sConfigOC;
+    TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig;
 
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 1098;   ///default setting for 1 Hz
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 65514;	 ///default setting for 1 Hz
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE; //needs to be enabled in order to change the frequency on the fly
-  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+    htim1.Instance = TIM1;
+    htim1.Init.Prescaler = 1098;   ///default setting for 1 Hz
+    htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim1.Init.Period = 65514;	 ///default setting for 1 Hz
+    htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim1.Init.RepetitionCounter = 0;
+    htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE; //needs to be enabled in order to change the frequency on the fly
+    if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+    {
+    	_Error_Handler(__FILE__, __LINE__);
+    }
 
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+    sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+    if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+    {
+    	_Error_Handler(__FILE__, __LINE__);
+    }
 
-  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+    if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+    {
+    	_Error_Handler(__FILE__, __LINE__);
+    }
 
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+    if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+    {
+    	_Error_Handler(__FILE__, __LINE__);
+    }
 
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;   //no pulse width
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
-  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = 0;   //no pulse width
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+    sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+    if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+    {
+    	_Error_Handler(__FILE__, __LINE__);
+    }
 
-  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
-  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
-  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
-  sBreakDeadTimeConfig.DeadTime = 0;
-  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
-  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
-  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
-  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+    sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+    sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+    sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+    sBreakDeadTimeConfig.DeadTime = 0;
+    sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+    sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+    sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+    if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+    {
+    	_Error_Handler(__FILE__, __LINE__);
+    }
 
-  GPIO_InitTypeDef GPIO_InitStruct;
-  ///TIM1 GPIO Configuration     PA8     ------> TIM1_CH1
-  GPIO_InitStruct.Pin = EXPOSE_REQUEST_OUT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
-  HAL_GPIO_Init(EXPOSE_REQUEST_OUT_GPIO_Port, &GPIO_InitStruct);
+    GPIO_InitTypeDef GPIO_InitStruct;
+    ///TIM1 GPIO Configuration     PA8     ------> TIM1_CH1
+    GPIO_InitStruct.Pin = EXPOSE_REQUEST_OUT_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
+    HAL_GPIO_Init(EXPOSE_REQUEST_OUT_GPIO_Port, &GPIO_InitStruct);
 
-  HAL_NVIC_SetPriority(TIM1_CC_IRQn, 15, 0);
-  HAL_NVIC_EnableIRQ(TIM1_CC_IRQn);
+    HAL_NVIC_SetPriority(TIM1_CC_IRQn, 15, 0);
+    HAL_NVIC_EnableIRQ(TIM1_CC_IRQn);
 
-  return VIO_STATUS_OK;
+    return VIO_STATUS_OK;
 }
 
 
@@ -304,6 +304,10 @@ vio_status_t vio_set_expreq_state(const void *newValue)
 
 		case VIO_EXPREQ_ONE_PULSE:
 		{
+			uint32_t pulseLength = 0;  //load the correct pulse width
+			vio_expreq_calc_timer_period(&expReq.OnePulse.lengthUs, &pulseLength);
+			__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pulseLength);
+
 			HAL_TIM_OnePulse_Start_IT(&htim1, TIM_CHANNEL_1);
 			expReq.State = VIO_EXPREQ_ONE_PULSE;
 
@@ -401,7 +405,6 @@ vio_status_t vio_set_expreq_fixpwm_pwidth(const void *newValue)
 	return result;
 }
 
-
 //Calculates the capture/compare register value to achieve a certain pulse width using the current prescaler setting of the timer.
 static void vio_expreq_calc_timer_period(const uint32_t *pulseUs, uint32_t *returnPeriod)
 {
@@ -409,12 +412,8 @@ static void vio_expreq_calc_timer_period(const uint32_t *pulseUs, uint32_t *retu
 	*returnPeriod = (float)cycles / (float)(__HAL_TIM_GET_PRESCALER(&htim1) + 1);
 
 	//clamp the period to the max timer resolution. This will only be needed if a bad combination of frequency and pulse widths have been chosen. Example when the pulse width is wider the the frequency period.
-	if(*returnPeriod > (TIMER_RESOLUTION - 1))
+	if(*returnPeriod > (TIMER_RESOLUTION - 1))   // @ TODO Should we return VIO_STATUS_OUT_OF_RANGE?
 			*returnPeriod = TIMER_RESOLUTION - 1;
-
-	//char buf[64];   //the stuff below is used for debugging. Will remove later.
-	//snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, __HAL_TIM_GET_PRESCALER(&htim1), period);
-	//vio_send_data(buf, strlen(buf));
 }
 
 vio_status_t vio_set_expreq_fixpwm_repeat(const void *newValue)
@@ -540,7 +539,7 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 			}
 
 			uint32_t nextPeriod = 0;
-			vio_expreq_calc_timer_period(&expReq.VarPwm.elements[expReq.VarPwm.position], &nextPeriod);
+			vio_expreq_calc_timer_period(&(expReq.VarPwm.elements[expReq.VarPwm.position]), &nextPeriod);
 			__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, nextPeriod);
 			break;
 		}
