@@ -26,6 +26,8 @@ const uint8_t VIO_PATCH_VERSION = 5;
 const char VIO_COMM_DELIMETER = ' ';
 const char VIO_COMM_TERMINATOR = '\n';
 
+uint32_t VIO_SERIAL_NUMBER = 1; //when fully implemented, this will be read and written in flash.
+
 static vio_status_t vio_get_fw_ver(char *buf, uint8_t len);
 static vio_status_t vio_get_ssr_state(char *buf, uint8_t len);
 static vio_status_t vio_get_expok_count(char *buf, uint8_t len);
@@ -38,7 +40,7 @@ static vio_status_t vio_set_expok_notify(const void *);
 static vio_status_t vio_set_serial_number(const void *);
 
 static vio_status_t vio_sys_reboot();
-//static vio_status_t vio_sys_dfu();
+static vio_status_t vio_sys_dfu();
 
 //this a jump table
 static vio_status_t(*vio_get[])(char *, uint8_t) =
@@ -96,6 +98,7 @@ static vio_status_t(*vio_set[])(const void *) =
 static vio_status_t(*vio_sys[])() =
 {
 	[VIO_CMD_SYS_REBOOT] = vio_sys_reboot,
+	[VIO_CMD_SYS_DFU]    = vio_sys_dfu,
 };
 
 static vio_exposeok_t expOk =
@@ -197,7 +200,7 @@ static vio_status_t vio_get_expok_notify(char *buf, uint8_t len)
 
 static vio_status_t vio_get_serial_number(char *buf, uint8_t len)
 {
-	buf = (char *)FS_Desc.GetSerialStrDescriptor(USBD_SPEED_FULL, (uint16_t *)&len);
+	snprintf(buf, len, "%lu", VIO_SERIAL_NUMBER);
 	return VIO_STATUS_OK;
 }
 
@@ -237,6 +240,7 @@ static vio_status_t vio_set_expok_notify(const void *newValue)
 
 static vio_status_t vio_set_serial_number(const void *newValue)
 {
+	VIO_SERIAL_NUMBER = *(uint32_t *)newValue;
 	return VIO_STATUS_OK;
 }
 
@@ -250,6 +254,15 @@ static vio_status_t vio_sys_reboot()
     NVIC_SystemReset();
 	return VIO_STATUS_OK;
 }
+
+static vio_status_t vio_sys_dfu()
+{
+	//have to send a response here as this will not return to vio_rcv_data
+    vio_send_data_vararg("not implemented%c", VIO_COMM_TERMINATOR);
+
+    return VIO_STATUS_OK;
+}
+
 
 vio_status_t vio_send_data(const char *buf, uint8_t len)
 {

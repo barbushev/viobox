@@ -381,10 +381,6 @@ vio_status_t vio_set_expreq_frequency(const void *newValue)
 
 		__HAL_TIM_SET_PRESCALER(&htim1, prescaler);
 		__HAL_TIM_SET_AUTORELOAD(&htim1, period);
-
-		//char buf[64];   //the stuff below is used for debugging. Will remove later.
-		//snprintf(buf, sizeof(buf), "cyl: %lu, scl: %lu, per: %lu\n", cycles, prescaler, period);
-		//vio_send_data(buf, strlen(buf));
 	}
 
 	return result;
@@ -500,8 +496,14 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 	switch(expReq.State)
 	{
 	case VIO_EXPREQ_ONE_PULSE:
-		vio_send_data_vararg("One Pulse%c", VIO_COMM_TERMINATOR);
-		break;
+		{
+			HAL_TIM_OnePulse_Stop_IT(&htim1, TIM_CHANNEL_1);
+			expReq.State = VIO_EXPREQ_IDLE;
+			if(expReq.notify == true)
+				vio_send_data_vararg("One Pulse%c", VIO_COMM_TERMINATOR);
+
+			break;
+		}
 	case VIO_EXPREQ_FIXED_PWM:
 		{
 			expReq.FixedPwm.private_counter++;
