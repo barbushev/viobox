@@ -49,6 +49,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_cdc_if.h"
+#include "viobox.h"
 
 /* USER CODE BEGIN INCLUDE */
 
@@ -301,7 +302,8 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 	function and waits until this function is completed before allowing new transfers on the OUT
 	endpoint (meanwhile, OUT packets will be NACKed) */
 
-	vio_recv_data(Buf, Len);
+	Buf[*Len] = '\0';
+	vio_recv_data((char *)Buf, (uint16_t) *Len);
 
 	USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
 	//prepare to receive the next data
